@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "target": "ES2018",
+    "module": "esnext",
+    "sourceMap": true,
+    "jsx": "react",
+    "strict": true,
+    "esModuleInterop": true
+  }
+}
