@@ -24,17 +24,17 @@ app.get("/", (req, res) => {
 	res.render("index");
 });
 
-app.get("/topics", async (req, res) => {
+app.get("/api/topics", async (req, res) => {
 	const topics = await admin.fetchTopicMetadata(undefined as any)
 	res.status(200).json(topics)
 })
 
-app.get("/topic/:topic", async (req, res) => {
+app.get("/api/topic/:topic", async (req, res) => {
 	const offsets = await admin.fetchTopicOffsets(req.params.topic)
 	res.status(200).json(offsets)
 })
 
-app.get("/messages/:topic/:partition/", async (req, res) => {
+app.get("/api/messages/:topic/:partition/", async (req, res) => {
 	const limit = req.query.limit || 100
 	const offset = req.query.offset || 0
 
