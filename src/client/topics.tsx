@@ -23,8 +23,8 @@ class CellButton extends React.Component<{ value: number }, {}> {
             msg = this.props.value.toString()
         }
         return (
-            <div style={{ width: "100%", justifyContent: 'center', textAlign: "center" }}>
-                <Button color="primary" size="small" onClick={() => console.log(this.props)}>
+            <div style={{ width: "100%", justifyContent: 'left', textAlign: "left", marginTop: -3 }}>
+                <Button color="primary" size="small" style={{ justifyContent: 'left', textAlign: "left" }} onClick={() => console.log(this.props)}>
                     <EventNote />
                     {msg}
                 </Button>
