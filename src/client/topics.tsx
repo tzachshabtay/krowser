@@ -4,9 +4,10 @@ import InputAdornment from '@material-ui/core/InputAdornment';
 import CircularProgress from '@material-ui/core/CircularProgress';
 import { AgGridReact } from 'ag-grid-react';
 import { GridReadyEvent, GridApi, ColumnApi } from 'ag-grid-community';
-import Button from '@material-ui/core/Button';
-import EventNote from '@material-ui/icons/EventNote';
 import Search from '@material-ui/icons/Search';
+import { RouteComponentProps } from "react-router-dom";
+import { CellProps, CellButton } from './cell_button';
+
 import 'ag-grid-community/dist/styles/ag-grid.css';
 import 'ag-grid-community/dist/styles/ag-theme-balham.css';
 
@@ -16,24 +17,19 @@ type State = {
     rows: any[];
 }
 
-class CellButton extends React.Component<{ value: number }, {}> {
+class ViewPartitionsButton extends React.Component<CellProps, {}> {
     render() {
-        let msg = "Loading"
-        if (this.props.value) {
-            msg = this.props.value.toString()
-        }
-        return (
-            <div style={{ width: "100%", justifyContent: 'left', textAlign: "left", marginTop: -3 }}>
-                <Button color="primary" size="small" style={{ justifyContent: 'left', textAlign: "left" }} onClick={() => console.log(this.props)}>
-                    <EventNote />
-                    {msg}
-                </Button>
-            </div>
-        )
+        return <CellButton getUrl={() => `/partitions/${this.props.data.topic}`} {...this.props} />
     }
 }
 
-export class Topics extends React.Component<{}, State> {
+class ViewMessagesButton extends React.Component<CellProps, {}> {
+    render() {
+        return <CellButton getUrl={() => `/messages/${this.props.data.topic}`} {...this.props} />
+    }
+}
+
+export class Topics extends React.Component<RouteComponentProps, State> {
     state: State = { search: "", loading: true, rows: [] }
     api: GridApi | null = null;
     columnApi: ColumnApi | null = null;
@@ -41,9 +37,8 @@ export class Topics extends React.Component<{}, State> {
     async componentDidMount() {
         const response = await fetch(`/api/topics`)
         const data = await response.json()
-        const results = data.topics.map((r: any) => {
-            return { topic: r.name, num_partitions: r.partitions.length, raw: r }
-        })
+        const results = data.topics.map((r: any) => (
+            { topic: r.name, num_partitions: r.partitions.length, raw: r, history: this.props.history }))
         this.setState({ loading: false, rows: results })
         for (const topic of results) {
             await this.fetchTopic(topic)
@@ -68,14 +63,15 @@ export class Topics extends React.Component<{}, State> {
     getColumnDefs() {
         return [
             { headerName: "Topic", field: "topic" },
-            { headerName: "#Partitions", field: "num_partitions", filter: "agNumberColumnFilter", cellRendererFramework: CellButton },
-            { headerName: "#Messages", field: "num_messages", filter: "agNumberColumnFilter", cellRendererFramework: CellButton }
+            { headerName: "#Partitions", field: "num_partitions", filter: "agNumberColumnFilter", cellRendererFramework: ViewPartitionsButton },
+            { headerName: "#Messages", field: "num_messages", filter: "agNumberColumnFilter", cellRendererFramework: ViewMessagesButton }
         ]
     }
 
     onGridReady = (params: GridReadyEvent) => {
         this.api = params.api;
         this.columnApi = params.columnApi;
+        this.api.refreshCells()
     }
 
     render() {

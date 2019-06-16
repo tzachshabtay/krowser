@@ -20,10 +20,6 @@ app.set("views", "public");
 console.log(__dirname)
 app.use("/assets", express.static(path.join(__dirname, "../client")));
 
-app.get("/", (req, res) => {
-	res.render("index");
-});
-
 app.get("/api/topics", async (req, res) => {
 	const topics = await admin.fetchTopicMetadata(undefined as any)
 	res.status(200).json(topics)
@@ -34,7 +30,7 @@ app.get("/api/topic/:topic", async (req, res) => {
 	res.status(200).json(offsets)
 })
 
-app.get("/api/messages/:topic/:partition/", async (req, res) => {
+app.get("/api/messages/:topic/:partition", async (req, res) => {
 	const limit = req.query.limit || 100
 	const offset = req.query.offset || 0
 
@@ -42,6 +38,7 @@ app.get("/api/messages/:topic/:partition/", async (req, res) => {
 	let numConsumed = 0
 	console.log(`Querying topic ${req.params.topic} (partition ${req.params.partition}) at offset=${offset}, limit=${limit}`)
 	consumer.subscribe({ topic: req.params.topic, fromBeginning: true })
+	const consumed: Set<string> = new Set<string>();
 	const p = new Promise<void>((resolve, reject) => {
 		setTimeout(() => {
 			reject("timeout")
@@ -53,7 +50,7 @@ app.get("/api/messages/:topic/:partition/", async (req, res) => {
 				console.log({
 					partition,
 					offset: message.offset,
-					value: message.value.toString(),
+					value: message.value ? message.value.toString() : "",
 				})
 
 				if (topic !== req.params.topic) {
@@ -61,12 +58,18 @@ app.get("/api/messages/:topic/:partition/", async (req, res) => {
 					return
 				}
 
+				if (consumed.has(message.offset)) {
+					console.log(`Ignoring duplicate message from offset ${message.offset}`)
+					return
+				}
+				consumed.add(message.offset)
+
 				if (parseInt(message.offset) < offset) {
 					console.log(`Ignoring message from an old offset: ${message.offset} (expecting at least ${offset})`)
 					return
 				}
 				numConsumed++
-				messages.push({ topic, partition, message, value: message.value.toString() })
+				messages.push({ topic, partition, message, value: message.value ? message.value.toString() : "" })
 				if (numConsumed >= limit) {
 					consumer.stop()
 					resolve()
@@ -85,6 +88,10 @@ app.get("/api/messages/:topic/:partition/", async (req, res) => {
 		res.status(500).json({ error, messages })
 	}
 })
+
+app.get("/*", (req, res) => {
+	res.render("index");
+});
 
 export const start = async (port: number): Promise<void> => {
 	const server = http.createServer(app);
