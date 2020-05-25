@@ -1,0 +1,19 @@
+{
+  "type" : "record",
+  "name" : "Test",
+  "namespace" : "test",
+  "fields" : [ {
+    "name" : "long_field",
+    "type" : "long"
+  }, {
+    "name" : "int_field",
+    "type" : "int"
+  }, {
+    "name" : "enum_field",
+    "type" : {
+      "type" : "enum",
+      "name" : "enum_type",
+      "symbols" : [ "option1", "option2", "option3", "option4" ]
+    }
+  } ]
+}

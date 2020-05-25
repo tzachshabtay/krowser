@@ -2,13 +2,17 @@ import express from "express";
 import http from "http";
 import path from "path";
 import { Kafka, KafkaMessage } from "kafkajs";
+import { SchemaRegistry } from '@ovotech/avro-kafkajs';
+import { Type } from "avsc";
 
 type MessageInfo = { topic: string, partition: number, value: string, message: KafkaMessage }
 
+const schemaRegistry = new SchemaRegistry({ uri: 'http://localhost:8081' });
 const kafka = new Kafka({
 	clientId: 'kafka-browser',
 	brokers: ['localhost:9092']
 })
+
 const admin = kafka.admin()
 const consumer = kafka.consumer({ groupId: `kafka-browser-${Date.now()}` })
 
@@ -39,18 +43,27 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 	console.log(`Querying topic ${req.params.topic} (partition ${req.params.partition}) at offset=${offset}, limit=${limit}`)
 	consumer.subscribe({ topic: req.params.topic, fromBeginning: true })
 	const consumed: Set<string> = new Set<string>();
-	const p = new Promise<void>((resolve, reject) => {
+	const p = new Promise<void>(async (resolve, reject) => {
 		setTimeout(() => {
 			reject("timeout")
 		}, 5000);
-		consumer.run({
+		await consumer.run({
 			autoCommit: false,
 			eachMessage: async ({ topic, partition, message }) => {
 				console.log(`---MESSAGE: ${message.offset}---`)
+				let schemaType : Type | undefined = undefined;
+				try {
+					const { type, value } = await schemaRegistry.decodeWithType<any>(message.value);
+					message.value = value;
+					schemaType = type;
+				} catch (error) {
+					console.log(`Not an avro message? error: ${error}`);
+				}
 				console.log({
 					partition,
 					offset: message.offset,
 					value: message.value ? message.value.toString() : "",
+					schemaType: schemaType,
 				})
 
 				if (topic !== req.params.topic) {
