@@ -28,10 +28,11 @@ type State = {
     offset: number;
     limit: number;
     partitions: any[];
+    customCols: {cols: {}};
 }
 
 export class Messages extends React.Component<Props, State> {
-    state: State = { search: "", partitions: [], offset: 0, limit: 10, loadingMessages: false, loadingPartitions: true, rows: [], partition: this.props.match.params.partition || "0" }
+    state: State = { search: "", partitions: [], offset: 0, limit: 10, loadingMessages: false, loadingPartitions: true, rows: [], partition: this.props.match.params.partition || "0", customCols: {cols: {}} }
     api: GridApi | null = null;
     columnApi: ColumnApi | null = null;
 
@@ -76,23 +77,42 @@ export class Messages extends React.Component<Props, State> {
         const response = await fetch(`/api/messages/${topic}/${this.state.partition}?limit=${limit}&offset=${this.state.offset}`)
         const data = await response.json()
         console.log(data)
+        const customCols = {cols: {}}
+        const rows = data.map((d: any) => this.getRow(d, customCols))
         this.setState({
-            loadingMessages: false, rows: data.map((d: any) => ({
-                timestamp: d.message.timestamp,
-                offset: parseInt(d.message.offset),
-                text: d.value,
-                key: d.message.key && d.message.key.data ? d.message.key.data.toString() : d.message.key,
-            }))
+            loadingMessages: false, rows, customCols
         })
     }
 
-    getColumnDefs() {
-        return [
-            { headerName: "Timestamp", field: "timestamp", valueFormatter: this.timeFormatter },
-            { headerName: "Offset", field: "offset", filter: "agNumberColumnFilter" },
-            { headerName: "Text", field: "text" },
-            { headerName: "Key", field: "key" },
+    getRow = (data: any, customCols: {cols: {}}): any => {
+        let row = {
+            rowTimestamp: data.message.timestamp,
+            rowOffset: parseInt(data.message.offset),
+            rowText: data.value,
+            rowKey: data.message.key && data.message.key.data ? data.message.key.data.toString() : data.message.key,
+        }
+        try {
+            const cols = JSON.parse(data.value)
+            row = {...row, ...cols}
+            customCols.cols = {...customCols.cols, ...cols}
+        }
+        catch (error) {
+            console.warn(`row is not json encoded, error: ${error}`)
+        }
+        return row
+    }
+
+    getColumnDefs = () => {
+        const cols: any[] = [
+            { headerName: "Timestamp", field: "rowTimestamp", valueFormatter: this.timeFormatter },
+            { headerName: "Offset", field: "rowOffset", filter: "agNumberColumnFilter" },
         ]
+        for (const prop in this.state.customCols.cols) {
+            cols.push({headerName: prop, field: prop})
+        }
+        cols.push({headerName: "Key", field: "rowKey"})
+        cols.push({headerName: "Text", field: "rowText"})
+        return cols
     }
 
     timeFormatter(params: any) {
@@ -117,8 +137,8 @@ export class Messages extends React.Component<Props, State> {
             return (<><CircularProgress /><div>Loading...</div></>)
         }
         let rows = this.state.rows
-        if (this.state.search != "") {
-            rows = rows.filter(r => r.text.includes(this.state.search))
+        if (this.state.search !== "") {
+            rows = rows.filter(r => r.rowText.includes(this.state.search))
         }
         const partitions = this.state.partitions.map(p => (<MenuItem key={p.label} value={p.value}>{p.label}</MenuItem>))
         return (
