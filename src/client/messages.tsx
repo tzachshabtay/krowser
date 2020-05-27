@@ -89,6 +89,7 @@ export class Messages extends React.Component<Props, State> {
             rowTimestamp: data.message.timestamp,
             rowOffset: parseInt(data.message.offset),
             rowText: data.value,
+            rowType: data.schemaType ? data.schemaType.name : "",
             rowKey: data.message.key && data.message.key.data ? data.message.key.data.toString() : data.message.key,
         }
         try {
@@ -106,6 +107,7 @@ export class Messages extends React.Component<Props, State> {
         const cols: any[] = [
             { headerName: "Timestamp", field: "rowTimestamp", valueFormatter: this.timeFormatter },
             { headerName: "Offset", field: "rowOffset", filter: "agNumberColumnFilter" },
+            { headerName: "Type", field: "rowType" }
         ]
         for (const prop in this.state.customCols.cols) {
             cols.push({headerName: prop, field: prop})

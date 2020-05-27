@@ -5,7 +5,7 @@ import { Kafka, KafkaMessage } from "kafkajs";
 import { SchemaRegistry } from '@ovotech/avro-kafkajs';
 import { Type } from "avsc";
 
-type MessageInfo = { topic: string, partition: number, value: string, message: KafkaMessage }
+type MessageInfo = { topic: string, partition: number, value: string, message: KafkaMessage, schemaType: Type | undefined }
 
 const schemaRegistry = new SchemaRegistry({ uri: 'http://localhost:8081' });
 const kafka = new Kafka({
@@ -82,7 +82,7 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 					return
 				}
 				numConsumed++
-				messages.push({ topic, partition, message, value: message.value ? message.value.toString() : "" })
+				messages.push({ topic, partition, message, value: message.value ? message.value.toString() : "", schemaType })
 				if (numConsumed >= limit) {
 					consumer.stop()
 					resolve()
