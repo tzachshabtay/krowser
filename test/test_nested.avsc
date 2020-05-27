@@ -1,0 +1,50 @@
+{
+  "type" : "record",
+  "name" : "test_nested",
+  "namespace" : "test",
+  "fields" : [ {
+    "name" : "nullable_long",
+    "type" : [ "null", "long" ],
+    "default" : null
+  }, {
+    "name" : "nested",
+    "type" : {
+      "type" : "record",
+      "name" : "Nested",
+      "fields" : [ {
+        "name" : "int_field",
+        "type" : "int"
+      }, {
+        "name" : "nullable_long",
+        "type" : [ "null", "long" ],
+        "default" : null
+      }, {
+        "name" : "boolean_field",
+        "type" : "boolean"
+      }, {
+        "name" : "string_field",
+        "type" : "string"
+      }, {
+        "name" : "nested2",
+        "type" : {
+          "type" : "record",
+          "name" : "Nested2",
+          "fields" : [ {
+            "name" : "int_field",
+            "type" : "int"
+          }, {
+            "name" : "nullable_long",
+            "type" : [ "null", "long" ],
+            "default" : null
+          }, {
+            "name" : "boolean_field",
+            "type" : "boolean"
+          }, {
+            "name" : "string_field",
+            "type" : "string"
+          } ]
+        }
+      } ]
+    }
+  }]
+}

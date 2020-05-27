@@ -1,6 +1,6 @@
 {
   "type" : "record",
-  "name" : "Test",
+  "name" : "test",
   "namespace" : "test",
   "fields" : [ {
     "name" : "long_field",
