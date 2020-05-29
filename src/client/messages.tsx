@@ -90,7 +90,7 @@ export class Messages extends React.Component<Props, State> {
             rowOffset: parseInt(data.message.offset),
             rowText: data.value,
             rowType: data.schemaType ? data.schemaType.name : "",
-            rowKey: data.message.key && data.message.key.data ? data.message.key.data.toString() : data.message.key,
+            rowKey: data.key,
         }
         try {
             const cols = JSON.parse(data.value)

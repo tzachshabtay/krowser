@@ -5,7 +5,7 @@ import { Kafka, KafkaMessage } from "kafkajs";
 import { SchemaRegistry } from '@ovotech/avro-kafkajs';
 import { Type } from "avsc";
 
-type MessageInfo = { topic: string, partition: number, value: string, message: KafkaMessage, schemaType: Type | undefined }
+type MessageInfo = { topic: string, partition: number, value: string, key: string, message: KafkaMessage, schemaType: Type | undefined }
 
 const schemaRegistry = new SchemaRegistry({ uri: 'http://localhost:8081' });
 const kafka = new Kafka({
@@ -59,11 +59,14 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 				} catch (error) {
 					console.log(`Not an avro message? error: ${error}`);
 				}
+				const value = message.value ? message.value.toString() : "";
+				const key = message.key ? message.key.toString() : "";
 				console.log({
 					partition,
 					offset: message.offset,
-					value: message.value ? message.value.toString() : "",
+					value: value,
 					schemaType: schemaType,
+					key: key,
 				})
 
 				if (topic !== req.params.topic) {
@@ -82,7 +85,7 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 					return
 				}
 				numConsumed++
-				messages.push({ topic, partition, message, value: message.value ? message.value.toString() : "", schemaType })
+				messages.push({ topic, partition, message, key, value, schemaType })
 				if (numConsumed >= limit) {
 					consumer.stop()
 					resolve()
