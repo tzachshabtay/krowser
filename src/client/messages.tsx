@@ -42,14 +42,22 @@ export class Messages extends React.Component<Props, State> {
 
     async fetchPartitions() {
         const response = await fetch(`/api/topic/${this.props.match.params.topic}`)
-        const data = await response.json()
+        const data: any[] = await response.json()
         const results = data.map((r: any) => {
-            const label = r.high.toString() === "0" ?
+            const isEmpty = r.high.toString() === "0"
+            const label = isEmpty ?
                 `Partition: ${r.partition} (Empty)` :
                 `Partition: ${r.partition} (Low- ${r.low}, High- ${r.high}, Current- ${r.offset})`;
-            return { label: label, value: r.partition.toString() }
+            return { label: label, value: r.partition.toString(), isEmpty }
         })
-        this.setState({ loadingPartitions: false, partitions: results })
+        const newState: any = { loadingPartitions: false, partitions: results }
+        if (this.props.match.params.partition === undefined) {
+            const nonEmpty = results.find(row => !row.isEmpty)
+            if (nonEmpty) {
+                newState.partition = nonEmpty.value
+            }
+        }
+        this.setState(newState)
     }
 
     async fetchMaxOffset() {
