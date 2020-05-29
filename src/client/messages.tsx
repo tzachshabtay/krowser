@@ -109,12 +109,22 @@ export class Messages extends React.Component<Props, State> {
             { headerName: "Offset", field: "rowOffset", filter: "agNumberColumnFilter" },
             { headerName: "Type", field: "rowType" }
         ]
-        for (const prop in this.state.customCols.cols) {
-            cols.push({headerName: prop, field: prop})
-        }
+        this.addCustomColumns(cols, this.state.customCols.cols, ``)
         cols.push({headerName: "Key", field: "rowKey"})
         cols.push({headerName: "Text", field: "rowText"})
         return cols
+    }
+
+    addCustomColumns = (cols: any[], fields: any, prefix: string) => {
+        for (const prop in fields) {
+            const val: any = fields[prop]
+            if (typeof val === 'object') {
+                this.addCustomColumns(cols, val, `${prefix}${prop}.`)
+            } else {
+                const name = `${prefix}${prop}`
+                cols.push({headerName: name, field: name})
+            }
+        }
     }
 
     timeFormatter(params: any) {
