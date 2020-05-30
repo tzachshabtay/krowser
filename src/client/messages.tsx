@@ -12,6 +12,7 @@ import FormControl from '@material-ui/core/FormControl';
 import Toolbar from '@material-ui/core/Toolbar';
 import 'ag-grid-community/dist/styles/ag-grid.css';
 import 'ag-grid-community/dist/styles/ag-theme-balham.css';
+import PlayArrowIcon from '@material-ui/icons/PlayArrow';
 import { KafkaToolbar} from './toolbar';
 
 interface Props extends RouteComponentProps<{ topic: string, partition?: string }> {
@@ -201,7 +202,7 @@ export class Messages extends React.Component<Props, State> {
                         </div>
                         <div>
                             <Button color="primary" variant="contained" style={{ marginTop: 18 }}
-                                onClick={async () => { await this.fetchMessages() }}>
+                                onClick={async () => { await this.fetchMessages() }} endIcon={<PlayArrowIcon />}>
                                 GO
                             </Button>
                         </div>
