@@ -1,10 +1,8 @@
 import React from "react";
-import TextField from '@material-ui/core/TextField';
-import InputAdornment from '@material-ui/core/InputAdornment';
 import CircularProgress from '@material-ui/core/CircularProgress';
 import { AgGridReact } from 'ag-grid-react';
 import { GridReadyEvent, GridApi, ColumnApi } from 'ag-grid-community';
-import Search from '@material-ui/icons/Search';
+import { KafkaToolbar} from './toolbar';
 import { RouteComponentProps } from "react-router-dom";
 import { CellProps, CellButton } from './cell_button';
 
@@ -81,20 +79,10 @@ export class Topics extends React.Component<RouteComponentProps, State> {
         }
         return (
             <>
-                <h1>Topics</h1>
-                <TextField
-                    label="Search"
-                    value={this.state.search}
-                    onChange={e => this.setState({ search: e.target.value })}
-                    margin="normal"
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <Search />
-                            </InputAdornment>
-                        )
-                    }}
-                />
+                <KafkaToolbar
+                    title="Topics"
+                    onSearch={e => this.setState({ search: e.target.value })}>
+                </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
                 {!this.state.loading && <div
                     className="ag-theme-balham"

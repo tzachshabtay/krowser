@@ -1,20 +1,18 @@
 import React from "react";
 import TextField from '@material-ui/core/TextField';
-import InputAdornment from '@material-ui/core/InputAdornment';
 import CircularProgress from '@material-ui/core/CircularProgress';
 import Button from '@material-ui/core/Button';
 import { AgGridReact } from 'ag-grid-react';
 import { GridReadyEvent, GridApi, ColumnApi } from 'ag-grid-community';
-import Search from '@material-ui/icons/Search';
 import { RouteComponentProps } from "react-router-dom";
 import Select from '@material-ui/core/Select';
 import InputLabel from '@material-ui/core/InputLabel';
 import MenuItem from '@material-ui/core/MenuItem';
 import FormControl from '@material-ui/core/FormControl';
-import Box from '@material-ui/core/Box';
 import Toolbar from '@material-ui/core/Toolbar';
 import 'ag-grid-community/dist/styles/ag-grid.css';
 import 'ag-grid-community/dist/styles/ag-theme-balham.css';
+import { KafkaToolbar} from './toolbar';
 
 interface Props extends RouteComponentProps<{ topic: string, partition?: string }> {
 }
@@ -163,24 +161,12 @@ export class Messages extends React.Component<Props, State> {
         const partitions = this.state.partitions.map(p => (<MenuItem key={p.label} value={p.value}>{p.label}</MenuItem>))
         return (
             <>
-                <h1>Topic: {this.props.match.params.topic}</h1>
+                <KafkaToolbar
+                    title={`Messages for topic: ${this.props.match.params.topic}`}
+                    onSearch={e => this.setState({ search: e.target.value })}>
+                </KafkaToolbar>
                 <Toolbar>
-                    <Box style={{ flex: 1 }}>
-                        <TextField
-                            label="Search"
-                            value={this.state.search}
-                            onChange={e => this.setState({ search: e.target.value })}
-                            margin="normal"
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <Search />
-                                    </InputAdornment>
-                                )
-                            }}
-                        />
-                    </Box>
-                    <div>
+                    <div style={{ flex: 1 }}>
                         <FormControl style={{ margin: 16, minWidth: 120 }}>
                             <InputLabel htmlFor="partition-select">Partition</InputLabel>
                             <Select
@@ -212,11 +198,13 @@ export class Messages extends React.Component<Props, State> {
                             style={{ marginRight: 10, maxWidth: 50 }}
                             inputProps={{ min: "0", step: "1" }}
                         />
-                        <Button color="primary" variant="contained" style={{ marginTop: 18 }}
-                            onClick={async () => { await this.fetchMessages() }}>
-                            GO
-                        </Button>
-                    </div>
+                        </div>
+                        <div>
+                            <Button color="primary" variant="contained" style={{ marginTop: 18 }}
+                                onClick={async () => { await this.fetchMessages() }}>
+                                GO
+                            </Button>
+                        </div>
                 </Toolbar>
                 <br />
                 {this.state.loadingMessages && <><CircularProgress /><div>Loading...</div></>}

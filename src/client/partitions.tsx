@@ -4,6 +4,7 @@ import { AgGridReact } from 'ag-grid-react';
 import { GridReadyEvent, GridApi, ColumnApi } from 'ag-grid-community';
 import { RouteComponentProps } from "react-router-dom";
 import { CellProps, CellButton } from './cell_button';
+import { KafkaToolbar} from './toolbar';
 import 'ag-grid-community/dist/styles/ag-grid.css';
 import 'ag-grid-community/dist/styles/ag-theme-balham.css';
 
@@ -49,7 +50,8 @@ export class Partitions extends React.Component<RouteComponentProps<{ topic: str
     render() {
         return (
             <>
-                <h1>Topic: {this.props.match.params.topic}</h1>
+                <KafkaToolbar title={`Partitions for topic: ${this.props.match.params.topic}`}>
+                </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
                 {!this.state.loading && <div
                     className="ag-theme-balham"
