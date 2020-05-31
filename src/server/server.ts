@@ -36,7 +36,7 @@ app.get("/api/topic/:topic", async (req, res) => {
 
 app.get("/api/messages/:topic/:partition", async (req, res) => {
 	const limit = req.query.limit || 100
-	const offset = req.query.offset || 0
+	const offset = req.query.offset ? parseInt(req.query.offset.toString()) : 0
 
 	const messages: MessageInfo[] = []
 	let numConsumed = 0
@@ -94,7 +94,7 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 		})
 	})
 
-	consumer.seek({ topic: req.params.topic, partition: req.params.partition, offset: offset })
+	consumer.seek({ topic: req.params.topic, partition: parseInt(req.params.partition), offset: offset.toString() })
 	try {
 		await p;
 		res.status(200).json(messages)
