@@ -13,7 +13,7 @@ import Toolbar from '@material-ui/core/Toolbar';
 import 'ag-grid-community/dist/styles/ag-grid.css';
 import 'ag-grid-community/dist/styles/ag-theme-balham.css';
 import PlayArrowIcon from '@material-ui/icons/PlayArrow';
-import { KafkaToolbar} from './toolbar';
+import { KafkaToolbar} from '../../common/toolbar';
 
 interface Props extends RouteComponentProps<{ topic: string, partition?: string }> {
 }

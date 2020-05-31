@@ -2,9 +2,9 @@ import React from "react";
 import CircularProgress from '@material-ui/core/CircularProgress';
 import { AgGridReact } from 'ag-grid-react';
 import { GridReadyEvent, GridApi, ColumnApi } from 'ag-grid-community';
-import { KafkaToolbar} from './toolbar';
+import { KafkaToolbar} from '../common/toolbar';
 import { RouteComponentProps } from "react-router-dom";
-import { CellProps, CellButton } from './cell_button';
+import { CellProps, CellButton } from '../common/cell_button';
 
 import 'ag-grid-community/dist/styles/ag-grid.css';
 import 'ag-grid-community/dist/styles/ag-theme-balham.css';

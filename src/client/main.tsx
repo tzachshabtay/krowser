@@ -1,9 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom";
 import { Route, Link, BrowserRouter as Router } from 'react-router-dom'
-import { Topics } from "./topics"
-import { Partitions } from "./partitions"
-import { Messages } from "./messages"
+import { Topics } from "./kafka/topics"
+import { Partitions } from "./kafka/partitions"
+import { Messages } from "./kafka/messages/messages"
 
 import "./style.css";
 
