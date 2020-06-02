@@ -28,7 +28,7 @@ export class Messages extends React.Component<Props, State> {
         let row = {
             rowTimestamp: data.message.timestamp,
             rowOffset: parseInt(data.message.offset),
-            rowText: data.value,
+            rowValue: data.value,
             rowType: data.schemaType ? data.schemaType.name : "",
             rowKey: data.key,
             rowTopic: data.topic,
@@ -57,7 +57,7 @@ export class Messages extends React.Component<Props, State> {
         }
         this.addCustomColumns(cols, this.state.customCols.cols, ``)
         cols.push({headerName: "Key", field: "rowKey"})
-        cols.push({headerName: "Text", field: "rowText"})
+        cols.push({headerName: "Value", field: "rowValue"})
         return cols
     }
 
@@ -106,7 +106,7 @@ export class Messages extends React.Component<Props, State> {
     render() {
         let rows = this.state.rows
         if (this.state.search !== "") {
-            rows = rows.filter(r => r.rowText.includes(this.state.search))
+            rows = rows.filter(r => r.rowValue.includes(this.state.search) || r.rowKey.includes(this.state.search))
         }
         const title = this.props.match.params.topic === undefined ? `Cross-Topic search` : `Messages for topic: ${this.props.match.params.topic}`
         return (
