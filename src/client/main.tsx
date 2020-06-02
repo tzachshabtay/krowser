@@ -15,6 +15,7 @@ const App = () => {
 				<Route path="/partitions/:topic" component={Partitions} />
 				<Route path="/messages/:topic/:partition" component={Messages} />
 				<Route path="/messages/:topic" exact component={Messages} />
+				<Route path="/messages-cross-topics" exact component={Messages} />
 			</div>
 		</Router>
 	)

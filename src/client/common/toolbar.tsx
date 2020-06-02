@@ -6,11 +6,12 @@ import Typography from '@material-ui/core/Typography';
 import InputBase from '@material-ui/core/InputBase';
 import { fade, makeStyles } from '@material-ui/core/styles';
 import MenuIcon from '@material-ui/icons/Menu';
+import MenuItem from '@material-ui/core/MenuItem';
+import Menu from '@material-ui/core/Menu';
 import SearchIcon from '@material-ui/icons/Search';
 import Tooltip from '@material-ui/core/Tooltip';
 import GitHubIcon from '@material-ui/icons/GitHub';
 import Link from '@material-ui/core/Link';
-
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -74,6 +75,16 @@ interface Props {
 
 export const KafkaToolbar: React.SFC<Props> = (props) => {
   const classes = useStyles();
+  const [anchorElement, setAnchorElement] = React.useState(null);
+  const menuOpen = Boolean(anchorElement);
+
+  const openMenu = (event: any) => {
+    setAnchorElement(event.currentTarget);
+  };
+
+  const closeMenu = () => {
+    setAnchorElement(null);
+  };
 
   return (
     <div className={classes.root}>
@@ -84,9 +95,29 @@ export const KafkaToolbar: React.SFC<Props> = (props) => {
             className={classes.menuButton}
             color="inherit"
             aria-label="open drawer"
+            onClick={openMenu}
           >
             <MenuIcon />
           </IconButton>
+          <Menu
+                id="menu-appbar"
+                anchorEl={anchorElement}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'left',
+                }}
+                keepMounted
+                transformOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'left',
+                }}
+                open={menuOpen}
+                onClose={closeMenu}
+              >
+                <Link href="/messages-cross-topics" color="inherit">
+                  <MenuItem><SearchIcon /> Search across topics</MenuItem>
+                </Link>
+            </Menu>
           <Typography className={classes.title} variant="h6" noWrap>
           <Link href="/" color="inherit">
             Kafka Browser

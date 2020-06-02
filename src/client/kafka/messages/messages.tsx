@@ -6,18 +6,21 @@ import 'ag-grid-community/dist/styles/ag-grid.css';
 import 'ag-grid-community/dist/styles/ag-theme-balham.css';
 import { KafkaToolbar} from '../../common/toolbar';
 import { SingleTopicInput} from './single_topic_input';
+import { MultiTopicsInput} from './multi_topics_input';
+import Typography from '@material-ui/core/Typography';
 
-interface Props extends RouteComponentProps<{ topic: string, partition?: string }> {
+interface Props extends RouteComponentProps<{ topic?: string, partition?: string }> {
 }
 
 type State = {
     search: string;
     rows: any[];
+    error: string;
     customCols: {cols: {}};
 }
 
 export class Messages extends React.Component<Props, State> {
-    state: State = { search: "", rows: [], customCols: {cols: {}} }
+    state: State = { search: "", rows: [], customCols: {cols: {}}, error: "" }
     api: GridApi | null = null;
     columnApi: ColumnApi | null = null;
 
@@ -28,6 +31,8 @@ export class Messages extends React.Component<Props, State> {
             rowText: data.value,
             rowType: data.schemaType ? data.schemaType.name : "",
             rowKey: data.key,
+            rowTopic: data.topic,
+            rowPartition: data.partition,
         }
         try {
             const cols = JSON.parse(data.value)
@@ -46,6 +51,10 @@ export class Messages extends React.Component<Props, State> {
             { headerName: "Offset", field: "rowOffset", filter: "agNumberColumnFilter" },
             { headerName: "Type", field: "rowType" }
         ]
+        if (this.props.match.params.topic === undefined) {
+            cols.push({headerName: "Topic", field: "rowTopic"})
+            cols.push({headerName: "Partition", field: "rowPartition"})
+        }
         this.addCustomColumns(cols, this.state.customCols.cols, ``)
         cols.push({headerName: "Key", field: "rowKey"})
         cols.push({headerName: "Text", field: "rowText"})
@@ -83,10 +92,14 @@ export class Messages extends React.Component<Props, State> {
 
     onDataFetched = (data: any) => {
         console.log(data)
+        if (data.error) {
+            this.setState({error: `Failed to fetch data. Error: ${data.error}`})
+            return
+        }
         const customCols = {cols: {}}
         const rows = data.map((d: any) => this.getRow(d, customCols))
         this.setState({
-            rows, customCols
+            rows, customCols, error: ""
         })
     }
 
@@ -95,18 +108,25 @@ export class Messages extends React.Component<Props, State> {
         if (this.state.search !== "") {
             rows = rows.filter(r => r.rowText.includes(this.state.search))
         }
+        const title = this.props.match.params.topic === undefined ? `Cross-Topic search` : `Messages for topic: ${this.props.match.params.topic}`
         return (
             <>
                 <KafkaToolbar
-                    title={`Messages for topic: ${this.props.match.params.topic}`}
+                    title={title}
                     onSearch={e => this.setState({ search: e.target.value })}>
                 </KafkaToolbar>
                 <br />
-                <SingleTopicInput
-                    topic={this.props.match.params.topic}
-                    partition={this.props.match.params.partition}
-                    onDataFetched={this.onDataFetched}>
-                </SingleTopicInput>
+                { this.props.match.params.topic === undefined ?
+                (
+                    <MultiTopicsInput onDataFetched={this.onDataFetched} search={this.state.search}></MultiTopicsInput>
+                ) : (
+                    <SingleTopicInput
+                        topic={this.props.match.params.topic}
+                        partition={this.props.match.params.partition}
+                        onDataFetched={this.onDataFetched}>
+                    </SingleTopicInput>
+                )}
+                { this.state.error && (<Typography color="error">{this.state.error}</Typography>)}
                 <div className="ag-theme-balham">
                     <AgGridReact
                         columnDefs={this.getColumnDefs()}
