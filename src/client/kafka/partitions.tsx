@@ -1,12 +1,9 @@
 import React from "react";
 import CircularProgress from '@material-ui/core/CircularProgress';
-import { AgGridReact } from 'ag-grid-react';
-import { GridReadyEvent, GridApi, ColumnApi } from 'ag-grid-community';
 import { RouteComponentProps } from "react-router-dom";
 import { CellProps, CellButton } from '../common/cell_button';
 import { KafkaToolbar} from '../common/toolbar';
-import 'ag-grid-community/dist/styles/ag-grid.css';
-import 'ag-grid-community/dist/styles/ag-theme-balham.css';
+import { Grid} from '../common/grid';
 
 type State = {
     loading: boolean;
@@ -21,8 +18,6 @@ class ViewMessagesButton extends React.Component<CellProps, {}> {
 
 export class Partitions extends React.Component<RouteComponentProps<{ topic: string }>, State> {
     state: State = { loading: true, rows: [] }
-    api: GridApi | null = null;
-    columnApi: ColumnApi | null = null;
 
     async componentDidMount() {
         const response = await fetch(`/api/topic/${this.props.match.params.topic}`)
@@ -42,29 +37,18 @@ export class Partitions extends React.Component<RouteComponentProps<{ topic: str
         ]
     }
 
-    onGridReady = (params: GridReadyEvent) => {
-        this.api = params.api;
-        this.columnApi = params.columnApi;
-    }
-
     render() {
         return (
             <>
                 <KafkaToolbar title={`Partitions for topic: ${this.props.match.params.topic}`}>
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
-                {!this.state.loading && <div
-                    className="ag-theme-balham"
-                >
-                    <AgGridReact
-                        columnDefs={this.getColumnDefs()}
-                        rowData={this.state.rows}
-                        domLayout='autoHeight'
-                        defaultColDef={{ sortable: true, filter: true, resizable: true }}
-                        onGridReady={this.onGridReady}
-                    >
-                    </AgGridReact>
-                </div>}
+                {!this.state.loading && <Grid
+                    shouldSearch={false}
+                    search={_ => true}
+                    rows={this.state.rows}
+                    columnDefs={this.getColumnDefs()}>
+                </Grid>}
             </>
         )
     }

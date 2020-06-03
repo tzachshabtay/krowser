@@ -1,10 +1,7 @@
 import React from "react";
-import { AgGridReact } from 'ag-grid-react';
-import { GridReadyEvent, GridApi, ColumnApi } from 'ag-grid-community';
 import { RouteComponentProps } from "react-router-dom";
-import 'ag-grid-community/dist/styles/ag-grid.css';
-import 'ag-grid-community/dist/styles/ag-theme-balham.css';
 import { KafkaToolbar} from '../../common/toolbar';
+import { Grid} from '../../common/grid';
 import { SingleTopicInput} from './single_topic_input';
 import { MultiTopicsInput} from './multi_topics_input';
 import Typography from '@material-ui/core/Typography';
@@ -21,8 +18,6 @@ type State = {
 
 export class Messages extends React.Component<Props, State> {
     state: State = { search: "", rows: [], customCols: {cols: {}}, error: "" }
-    api: GridApi | null = null;
-    columnApi: ColumnApi | null = null;
 
     getRow = (data: any, customCols: {cols: {}}): any => {
         let row = {
@@ -85,11 +80,6 @@ export class Messages extends React.Component<Props, State> {
         return `${month}/${day}/${year} ${hour}:${minute}:${second}.${millis}`
     }
 
-    onGridReady = (params: GridReadyEvent) => {
-        this.api = params.api;
-        this.columnApi = params.columnApi;
-    }
-
     onDataFetched = (data: any) => {
         console.log(data)
         if (data.error) {
@@ -104,10 +94,6 @@ export class Messages extends React.Component<Props, State> {
     }
 
     render() {
-        let rows = this.state.rows
-        if (this.state.search !== "") {
-            rows = rows.filter(r => r.rowValue.includes(this.state.search) || r.rowKey.includes(this.state.search))
-        }
         const title = this.props.match.params.topic === undefined ? `Cross-Topic search` : `Messages for topic: ${this.props.match.params.topic}`
         return (
             <>
@@ -127,16 +113,12 @@ export class Messages extends React.Component<Props, State> {
                     </SingleTopicInput>
                 )}
                 { this.state.error && (<Typography color="error">{this.state.error}</Typography>)}
-                <div className="ag-theme-balham">
-                    <AgGridReact
-                        columnDefs={this.getColumnDefs()}
-                        rowData={rows}
-                        domLayout='autoHeight'
-                        defaultColDef={{ sortable: true, filter: true, resizable: true }}
-                        onGridReady={this.onGridReady}
-                    >
-                    </AgGridReact>
-                </div>
+                <Grid
+                    shouldSearch={this.state.search !== ""}
+                    search={r => r.rowValue.includes(this.state.search) || r.rowKey.includes(this.state.search)}
+                    rows={this.state.rows}
+                    columnDefs={this.getColumnDefs()}
+                ></Grid>
             </>
         )
     }
