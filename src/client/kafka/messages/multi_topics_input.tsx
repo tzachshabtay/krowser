@@ -59,6 +59,8 @@ export class MultiTopicsInput extends React.Component<Props, State> {
             </MenuItem>))
 
         const searchFrom = [`Beginning`, `End`].map((from: string) => (<MenuItem key={from} value={from}>{from}</MenuItem>))
+        const allTopicsSelected = this.state.selectedTopics.length === this.state.topics.length
+
         return (
             <Toolbar>
                 <div style={{ flex: 1 }}>
@@ -68,12 +70,27 @@ export class MultiTopicsInput extends React.Component<Props, State> {
                             value={this.state.selectedTopics}
                             multiple
                             renderValue={(selected: any) => selected.length > 2 ? `${selected.length} topics` : selected.join(', ')}
-                            onChange={(e: any) => this.setState({ selectedTopics: e.target.value })}
+                            onChange={(e: any) => {
+                                let selected = e.target.value
+                                if (selected && selected.includes("SelectAll")) {
+                                    if (allTopicsSelected) {
+                                        selected = []
+                                    } else {
+                                        selected = this.state.topics
+                                    }
+                                }
+                                this.setState({ selectedTopics: selected })
+                            }}
                             inputProps={{
                                 name: 'topics',
                                 id: 'topics-select',
                             }}
                         >
+                            <MenuItem key={"select all topics"} value="SelectAll">
+                                <Checkbox checked={allTopicsSelected} />
+                                <ListItemText primary={allTopicsSelected ? "Select none" : "Select all"} />
+                            </MenuItem>
+
                             {topics}
                         </Select>
                     </FormControl>
