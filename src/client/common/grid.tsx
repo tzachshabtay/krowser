@@ -5,14 +5,14 @@ import { GridReadyEvent, GridApi, ColumnApi, ColDef } from 'ag-grid-community';
 import 'ag-grid-community/dist/styles/ag-grid.css';
 import 'ag-grid-community/dist/styles/ag-theme-balham.css';
 
-interface Props {
-    shouldSearch: boolean;
+export interface GridProps {
+    searchQuery: string;
     search: (row: any) => boolean;
     rows: any[];
     columnDefs: ColDef[];
 }
 
-export class Grid extends React.Component<Props> {
+export class Grid extends React.Component<GridProps> {
     api: GridApi | null = null;
     columnApi: ColumnApi | null = null;
 
@@ -30,7 +30,7 @@ export class Grid extends React.Component<Props> {
 
     render() {
         let rows = this.props.rows
-        if (this.props.shouldSearch) {
+        if (this.props.searchQuery) {
             rows = rows.filter(this.props.search)
         }
         return (

@@ -3,7 +3,7 @@ import CircularProgress from '@material-ui/core/CircularProgress';
 import { RouteComponentProps } from "react-router-dom";
 import { CellProps, CellButton } from '../common/cell_button';
 import { KafkaToolbar} from '../common/toolbar';
-import { Grid} from '../common/grid';
+import { DataView} from '../common/data_view';
 
 type State = {
     loading: boolean;
@@ -43,12 +43,13 @@ export class Partitions extends React.Component<RouteComponentProps<{ topic: str
                 <KafkaToolbar title={`Partitions for topic: ${this.props.match.params.topic}`}>
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
-                {!this.state.loading && <Grid
-                    shouldSearch={false}
+                {!this.state.loading && <DataView
+                    searchQuery=""
                     search={_ => true}
                     rows={this.state.rows}
+                    jsonRows={this.state.rows.map(r => ({topic: r.topic, ...r.raw}))}
                     columnDefs={this.getColumnDefs()}>
-                </Grid>}
+                </DataView>}
             </>
         )
     }

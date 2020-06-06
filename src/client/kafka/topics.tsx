@@ -1,7 +1,7 @@
 import React from "react";
 import CircularProgress from '@material-ui/core/CircularProgress';
 import { KafkaToolbar} from '../common/toolbar';
-import { Grid} from '../common/grid';
+import { DataView} from '../common/data_view';
 import { RouteComponentProps } from "react-router-dom";
 import { CellProps, CellButton } from '../common/cell_button';
 
@@ -26,7 +26,7 @@ class ViewMessagesButton extends React.Component<CellProps, {}> {
 
 export class Topics extends React.Component<RouteComponentProps, State> {
     state: State = { search: "", loading: true, rows: [] }
-    grid: Grid | undefined = undefined;
+    grid: DataView | undefined = undefined;
 
     async componentDidMount() {
         const response = await fetch(`/api/topics`)
@@ -52,6 +52,7 @@ export class Topics extends React.Component<RouteComponentProps, State> {
         if (this.grid) {
             this.grid.RefreshCells()
         }
+        this.forceUpdate();
     }
 
     getColumnDefs() {
@@ -70,14 +71,15 @@ export class Topics extends React.Component<RouteComponentProps, State> {
                     onSearch={e => this.setState({ search: e.target.value })}>
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
-                {!this.state.loading && <Grid
-                    shouldSearch={this.state.search !== ""}
+                {!this.state.loading && <DataView
+                    searchQuery={this.state.search}
                     search={r => r.topic.includes(this.state.search)}
                     rows={this.state.rows}
+                    jsonRows={this.state.rows.map(r => ({...r.raw, num_messages: r.num_messages, offsets: r.offsets }))}
                     columnDefs={this.getColumnDefs()}
                     ref={r => {if (r) this.grid = r;}}
                     >
-                </Grid>}
+                </DataView>}
             </>
         )
     }

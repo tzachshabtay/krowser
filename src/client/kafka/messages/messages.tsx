@@ -1,7 +1,7 @@
 import React from "react";
 import { RouteComponentProps } from "react-router-dom";
 import { KafkaToolbar} from '../../common/toolbar';
-import { Grid} from '../../common/grid';
+import { DataView} from '../../common/data_view';
 import { SingleTopicInput} from './single_topic_input';
 import { MultiTopicsInput} from './multi_topics_input';
 import Typography from '@material-ui/core/Typography';
@@ -20,7 +20,7 @@ export class Messages extends React.Component<Props, State> {
     state: State = { search: "", rows: [], customCols: {cols: {}}, error: "" }
 
     getRow = (data: any, customCols: {cols: {}}): any => {
-        let row = {
+        let row: any = {
             rowTimestamp: data.message.timestamp,
             rowOffset: parseInt(data.message.offset),
             rowValue: data.value,
@@ -31,7 +31,18 @@ export class Messages extends React.Component<Props, State> {
         }
         try {
             const cols = JSON.parse(data.value)
+            let jsonRow: any = {}
+            for (const col in row) {
+                if (col === "rowValue") {
+                    jsonRow.Value = cols;
+                    continue;
+                }
+                if (col.startsWith("row")) {
+                    jsonRow[col.substring(3)] = row[col];
+                }
+            }
             row = {...row, ...cols}
+            row.rowJson = jsonRow;
             customCols.cols = {...customCols.cols, ...cols}
         }
         catch (error) {
@@ -113,12 +124,13 @@ export class Messages extends React.Component<Props, State> {
                     </SingleTopicInput>
                 )}
                 { this.state.error && (<Typography color="error">{this.state.error}</Typography>)}
-                <Grid
-                    shouldSearch={this.state.search !== ""}
+                <DataView
                     search={r => r.rowValue.includes(this.state.search) || r.rowKey.includes(this.state.search)}
+                    searchQuery={this.state.search}
                     rows={this.state.rows}
+                    jsonRows={this.state.rows.map(r => r.rowJson)}
                     columnDefs={this.getColumnDefs()}
-                ></Grid>
+                ></DataView>
             </>
         )
     }
