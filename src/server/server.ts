@@ -1,7 +1,7 @@
 import express from "express";
 import http from "http";
 import path from "path";
-import { Kafka, KafkaMessage } from "kafkajs";
+import { Kafka, KafkaMessage, ResourceTypes, DescribeConfigResponse } from "kafkajs";
 import { SchemaRegistry } from '@ovotech/avro-kafkajs';
 import { Type } from "avsc";
 import { v4 as uuidv4 } from 'uuid';
@@ -33,7 +33,13 @@ app.get("/api/topics", async (req, res) => {
 
 app.get("/api/topic/:topic", async (req, res) => {
 	const offsets = await admin.fetchTopicOffsets(req.params.topic)
-	res.status(200).json(offsets)
+	const config = await getTopicConfig(req.params.topic)
+	res.status(200).json({offsets, config})
+})
+
+app.get("/api/topic/:topic/config", async (req, res) => {
+	const config = await getTopicConfig(req.params.topic)
+	res.status(200).json({config})
 })
 
 app.get("/api/messages/:topic/:partition", async (req, res) => {
@@ -85,6 +91,18 @@ app.get("/api/messages-cross-topics/:topics", async (req, res) => {
 app.get("/*", (req, res) => {
 	res.render("index");
 });
+
+const getTopicConfig = async (topic: string) :Promise<DescribeConfigResponse> => {
+	return await admin.describeConfigs({
+		includeSynonyms: false,
+		resources: [
+			{
+			type: ResourceTypes.TOPIC,
+			name: topic
+			}
+		]
+	})
+}
 
 const getMessages = async (input: TopicQueryInput): Promise<MessageInfo[]> => {
 	const consumer = kafka.consumer({ groupId: `kafka-browser-${Date.now()}=${uuidv4()}` })

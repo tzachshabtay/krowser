@@ -12,7 +12,7 @@ type State = {
 
 class ViewMessagesButton extends React.Component<CellProps, {}> {
     render() {
-        return <CellButton getUrl={() => `/messages/${this.props.data.topic}/${this.props.data.partition}`} {...this.props} />
+        return <CellButton getUrl={() => `/topic/messages/${this.props.data.topic}/${this.props.data.partition}`} {...this.props} />
     }
 }
 
@@ -22,7 +22,7 @@ export class Partitions extends React.Component<RouteComponentProps<{ topic: str
     async componentDidMount() {
         const response = await fetch(`/api/topic/${this.props.match.params.topic}`)
         const data = await response.json()
-        const results = data.map((r: any) => {
+        const results = data.offsets.map((r: any) => {
             return { partition: r.partition, offset: r.offset, low: r.low, high: r.high, topic: this.props.match.params.topic, raw: r, history: this.props.history }
         })
         this.setState({ loading: false, rows: results })

@@ -14,13 +14,19 @@ type State = {
 
 class ViewPartitionsButton extends React.Component<CellProps, {}> {
     render() {
-        return <CellButton getUrl={() => `/partitions/${this.props.data.topic}`} {...this.props} />
+        return <CellButton getUrl={() => `/topic/partitions/${this.props.data.topic}`} {...this.props} />
+    }
+}
+
+class ViewConfigsButton extends React.Component<CellProps, {}> {
+    render() {
+        return <CellButton getUrl={() => `/topic/configs/${this.props.data.topic}`} {...this.props} />
     }
 }
 
 class ViewMessagesButton extends React.Component<CellProps, {}> {
     render() {
-        return <CellButton getUrl={() => `/messages/${this.props.data.topic}`} {...this.props} />
+        return <CellButton getUrl={() => `/topic/messages/${this.props.data.topic}`} {...this.props} />
     }
 }
 
@@ -43,12 +49,14 @@ export class Topics extends React.Component<RouteComponentProps, State> {
         const response = await fetch(`/api/topic/${topic.topic}`)
         const data = await response.json()
         let sum = 0
-        for (const partition of data) {
+        for (const partition of data.offsets) {
             const high = parseInt(partition.high)
             sum += high
         }
-        topic.offsets = data
+        topic.offsets = data.offsets
+        topic.config = data.config
         topic.num_messages = sum
+        topic.num_configs = data.config.resources[0].configEntries.length
         if (this.grid) {
             const api = this.grid.GetGridApi()
             if (api) {
@@ -62,7 +70,8 @@ export class Topics extends React.Component<RouteComponentProps, State> {
         return [
             { headerName: "Topic", field: "topic" },
             { headerName: "#Partitions", field: "num_partitions", filter: "agNumberColumnFilter", cellRendererFramework: ViewPartitionsButton },
-            { headerName: "#Messages", field: "num_messages", filter: "agNumberColumnFilter", cellRendererFramework: ViewMessagesButton }
+            { headerName: "#Messages", field: "num_messages", filter: "agNumberColumnFilter", cellRendererFramework: ViewMessagesButton },
+            { headerName: "#Configs", field: "num_configs", filter: "agNumberColumnFilter", cellRendererFramework: ViewConfigsButton },
         ]
     }
 
@@ -78,7 +87,7 @@ export class Topics extends React.Component<RouteComponentProps, State> {
                     searchQuery={this.state.search}
                     search={r => r.topic.includes(this.state.search)}
                     rows={this.state.rows}
-                    jsonRows={this.state.rows.map(r => ({...r.raw, num_messages: r.num_messages, offsets: r.offsets }))}
+                    jsonRows={this.state.rows.map(r => ({...r.raw, num_messages: r.num_messages, offsets: r.offsets, config: r.config }))}
                     columnDefs={this.getColumnDefs()}
                     ref={r => {if (r) this.grid = r;}}
                     >

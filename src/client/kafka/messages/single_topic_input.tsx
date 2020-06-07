@@ -33,8 +33,8 @@ export class SingleTopicInput extends React.Component<Props, State> {
 
     async fetchPartitions() {
         const response = await fetch(`/api/topic/${this.props.topic}`)
-        const data: any[] = await response.json()
-        const results = data.map((r: any) => {
+        const data: any = await response.json()
+        const results = data.offsets.map((r: any) => {
             const isEmpty = r.high.toString() === "0"
             const label = isEmpty ?
                 `Partition: ${r.partition} (Empty)` :
@@ -43,7 +43,7 @@ export class SingleTopicInput extends React.Component<Props, State> {
         })
         const newState: any = { loadingPartitions: false, partitions: results }
         if (this.props.partition === undefined) {
-            const nonEmpty = results.find(row => !row.isEmpty)
+            const nonEmpty = results.find((row: any) => !row.isEmpty)
             if (nonEmpty) {
                 newState.partition = nonEmpty.value
             }
@@ -54,7 +54,7 @@ export class SingleTopicInput extends React.Component<Props, State> {
     async fetchMaxOffset() {
         const response = await fetch(`/api/topic/${this.props.topic}`)
         const data = await response.json()
-        for (const r of data) {
+        for (const r of data.offsets) {
             if (r.partition.toString() === this.state.partition) {
                 return parseInt(r.high)
             }
