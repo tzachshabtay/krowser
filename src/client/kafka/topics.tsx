@@ -50,7 +50,10 @@ export class Topics extends React.Component<RouteComponentProps, State> {
         topic.offsets = data
         topic.num_messages = sum
         if (this.grid) {
-            this.grid.RefreshCells()
+            const api = this.grid.GetGridApi()
+            if (api) {
+                api.refreshCells()
+            }
         }
         this.forceUpdate();
     }

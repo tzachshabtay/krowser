@@ -5,6 +5,7 @@ import { DataView} from '../../common/data_view';
 import { SingleTopicInput} from './single_topic_input';
 import { MultiTopicsInput} from './multi_topics_input';
 import Typography from '@material-ui/core/Typography';
+import { GridReadyEvent, GridApi, ColumnApi, FilterChangedEvent } from 'ag-grid-community';
 
 interface Props extends RouteComponentProps<{ topic?: string, partition?: string }> {
 }
@@ -18,6 +19,8 @@ type State = {
 
 export class Messages extends React.Component<Props, State> {
     state: State = { search: "", rows: [], customCols: {cols: {}}, error: "" }
+    api: GridApi | null = null;
+    columnApi: ColumnApi | null = null;
 
     getRow = (data: any, customCols: {cols: {}}): any => {
         let row: any = {
@@ -51,6 +54,33 @@ export class Messages extends React.Component<Props, State> {
         return row
     }
 
+    onGridReady = (params: GridReadyEvent) => {
+        this.api = params.api;
+        this.columnApi = params.columnApi;
+    }
+
+    onFilterChanged = (event: FilterChangedEvent) => {
+        if (!this.columnApi) {
+            return
+        }
+        const nonEmptyCols = this.getNonEmptyColumns()
+        for (const col of this.columnApi.getAllColumns()) {
+            let id = col.getColDef().field!
+            if (id.startsWith("row")) {
+                continue
+            }
+            const nestingIndex = id.indexOf('.')
+            if (nestingIndex >= 1) {
+                id = id.substring(0, nestingIndex)
+            }
+            if (nonEmptyCols[id]) {
+                this.columnApi.setColumnVisible(col, true)
+            } else {
+                this.columnApi.setColumnVisible(col, false)
+            }
+        }
+    }
+
     getColumnDefs = () => {
         const cols: any[] = [
             { headerName: "Timestamp", field: "rowTimestamp", valueFormatter: this.timeFormatter },
@@ -77,6 +107,25 @@ export class Messages extends React.Component<Props, State> {
                 cols.push({headerName: name, field: name})
             }
         }
+    }
+
+    getNonEmptyColumns = (): any => {
+        if (!this.api) {
+            return undefined
+        }
+        const filterModel = this.api.getFilterModel()
+        if (Object.keys(filterModel).length === 0) {
+            return undefined
+        }
+        const nonEmptyColumns: any = {}
+        this.api.forEachNodeAfterFilter((node, index) => {
+            for (const col in node.data) {
+                if (node.data[col]) {
+                    nonEmptyColumns[col] = true
+                }
+            }
+        })
+        return nonEmptyColumns
     }
 
     timeFormatter(params: any) {
@@ -130,6 +179,8 @@ export class Messages extends React.Component<Props, State> {
                     rows={this.state.rows}
                     jsonRows={this.state.rows.map(r => r.rowJson)}
                     columnDefs={this.getColumnDefs()}
+                    onGridReady={this.onGridReady}
+                    onFilterChanged={this.onFilterChanged}
                 ></DataView>
             </>
         )
