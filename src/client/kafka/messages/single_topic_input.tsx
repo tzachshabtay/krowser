@@ -51,29 +51,10 @@ export class SingleTopicInput extends React.Component<Props, State> {
         this.setState(newState)
     }
 
-    async fetchMaxOffset() {
-        const response = await fetch(`/api/topic/${this.props.topic}`)
-        const data = await response.json()
-        for (const r of data.offsets) {
-            if (r.partition.toString() === this.state.partition) {
-                return parseInt(r.high)
-            }
-        }
-        return 0
-    }
-
     async fetchMessages() {
         this.setState({ loadingMessages: true })
-        const maxOffset = await this.fetchMaxOffset()
-        if ((!maxOffset && maxOffset !== 0) || this.state.offset > maxOffset) {
-            return
-        }
-        let limit = this.state.limit
-        if (this.state.offset + limit > maxOffset) {
-            limit = maxOffset - this.state.offset
-        }
         const topic = this.props.topic
-        const response = await fetch(`/api/messages/${topic}/${this.state.partition}?limit=${limit}&offset=${this.state.offset}`)
+        const response = await fetch(`/api/messages/${topic}/${this.state.partition}?limit=${this.state.limit}&offset=${this.state.offset}`)
         const data = await response.json()
         this.props.onDataFetched(data)
         this.setState({loadingMessages: false})

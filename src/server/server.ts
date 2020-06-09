@@ -44,10 +44,28 @@ app.get("/api/topic/:topic/config", async (req, res) => {
 
 app.get("/api/messages/:topic/:partition", async (req, res) => {
 	try {
-		const limit = req.query.limit ? parseInt(req.query.limit.toString()) : 100
+		let limit = req.query.limit ? parseInt(req.query.limit.toString()) : 100
 		const offset = req.query.offset ? parseInt(req.query.offset.toString()) : 0
-		const messages = await getMessages({topic: req.params.topic, partition: parseInt(req.params.partition), limit, offset, search: ""})
-		res.status(200).json(messages)
+		const topic = req.params.topic
+		const partition = parseInt(req.params.partition)
+		const partitions = await admin.fetchTopicOffsets(topic)
+		for (const partitionOffsets of partitions) {
+			if (partitionOffsets.partition !== partition) {
+				continue
+			}
+			const maxOffset = parseInt(partitionOffsets.high)
+			if (maxOffset === 0 || offset > maxOffset) {
+				res.status(200).json([])
+				break
+			}
+			if (offset + limit > maxOffset) {
+				limit = maxOffset - offset
+			}
+			const messages = await getMessages({topic, partition, limit, offset, search: ""})
+			res.status(200).json(messages)
+			break
+		}
+		res.status(404).json(`partition ${partition} not found for topic ${topic}`)
 	}
 	catch (error) {
 		res.status(500).json({ error })
