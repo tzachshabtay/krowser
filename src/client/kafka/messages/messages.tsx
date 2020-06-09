@@ -169,6 +169,7 @@ export class Messages extends React.Component<Props, State> {
                     <SingleTopicInput
                         topic={this.props.match.params.topic}
                         partition={this.props.match.params.partition}
+                        search={this.state.search}
                         onDataFetched={this.onDataFetched}>
                     </SingleTopicInput>
                 )}

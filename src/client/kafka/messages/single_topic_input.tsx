@@ -11,6 +11,7 @@ import { GoButton } from './go_button';
 interface Props {
     topic: string;
     partition?: string;
+    search: string;
     onDataFetched: (data: any) => void;
 }
 
@@ -54,7 +55,7 @@ export class SingleTopicInput extends React.Component<Props, State> {
     async fetchMessages() {
         this.setState({ loadingMessages: true })
         const topic = this.props.topic
-        const response = await fetch(`/api/messages/${topic}/${this.state.partition}?limit=${this.state.limit}&offset=${this.state.offset}`)
+        const response = await fetch(`/api/messages/${topic}/${this.state.partition}?limit=${this.state.limit}&offset=${this.state.offset}&search=${this.props.search}`)
         const data = await response.json()
         this.props.onDataFetched(data)
         this.setState({loadingMessages: false})

@@ -47,6 +47,7 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 		let limit = req.query.limit ? parseInt(req.query.limit.toString()) : 100
 		const offset = req.query.offset ? parseInt(req.query.offset.toString()) : 0
 		const topic = req.params.topic
+		const search = req.query.search ? req.query.search as string : ""
 		const partition = parseInt(req.params.partition)
 		const partitions = await admin.fetchTopicOffsets(topic)
 		for (const partitionOffsets of partitions) {
@@ -61,7 +62,7 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 			if (offset + limit > maxOffset) {
 				limit = maxOffset - offset
 			}
-			const messages = await getMessages({topic, partition, limit, offset, search: ""})
+			const messages = await getMessages({topic, partition, limit, offset, search})
 			res.status(200).json(messages)
 			break
 		}
