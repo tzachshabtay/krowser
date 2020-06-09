@@ -5,15 +5,16 @@ import { Kafka, KafkaMessage, ResourceTypes, DescribeConfigResponse } from "kafk
 import { SchemaRegistry } from '@ovotech/avro-kafkajs';
 import { Type } from "avsc";
 import { v4 as uuidv4 } from 'uuid';
+import { KAFKA_URL, SCHEMA_REGISTRY_URL } from "./config";
 
 type MessageInfo = { topic: string, partition: number, value: string, key: string, message: KafkaMessage, schemaType: Type | undefined }
 
 type TopicQueryInput = { topic: string, partition: number, limit: number, offset: number, search: string}
 
-const schemaRegistry = new SchemaRegistry({ uri: 'http://localhost:8081' });
+const schemaRegistry = new SchemaRegistry({ uri: SCHEMA_REGISTRY_URL });
 const kafka = new Kafka({
 	clientId: 'kafka-browser',
-	brokers: ['localhost:9092']
+	brokers: [KAFKA_URL]
 })
 
 const admin = kafka.admin()
