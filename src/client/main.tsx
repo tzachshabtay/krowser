@@ -1,10 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom";
-import { Route, Link, BrowserRouter as Router } from 'react-router-dom'
+import { Route, BrowserRouter as Router } from 'react-router-dom'
 import { Topics } from "./kafka/topics"
 import { Partitions } from "./kafka/partitions"
 import { Messages } from "./kafka/messages/messages"
 import { TopicConfigs } from "./kafka/topic_configs"
+import { Subjects } from "./schema-registry/subjects"
+import { Versions } from "./schema-registry/versions"
 
 import "./style.css";
 
@@ -18,6 +20,8 @@ const App = () => {
 				<Route path="/topic/messages/:topic/:partition" component={Messages} />
 				<Route path="/topic/messages/:topic" exact component={Messages} />
 				<Route path="/messages-cross-topics" exact component={Messages} />
+				<Route path="/schema-registry/subjects" exact component={Subjects} />
+				<Route path="/schema-registry/versions/:subject" exact component={Versions} />
 			</div>
 		</Router>
 	)

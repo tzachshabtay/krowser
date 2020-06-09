@@ -108,6 +108,21 @@ app.get("/api/messages-cross-topics/:topics", async (req, res) => {
 	}
 })
 
+app.get("/api/schema-registry/subjects", async (req, res) => {
+	const subjects = await schemaRegistry.getSubjects()
+	res.status(200).json(subjects)
+});
+
+app.get("/api/schema-registry/versions/:subject", async (req, res) => {
+	const versions = await schemaRegistry.getSubjectVersions(req.params.subject)
+	res.status(200).json(versions)
+})
+
+app.get("/api/schema-registry/schema/:subject/:version", async (req, res) => {
+	const schema = await schemaRegistry.getSubjectVersionSchema(req.params.subject, parseInt(req.params.version))
+	res.status(200).json(schema)
+})
+
 app.get("/*", (req, res) => {
 	res.render("index");
 });

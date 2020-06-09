@@ -11,6 +11,7 @@ import Menu from '@material-ui/core/Menu';
 import SearchIcon from '@material-ui/icons/Search';
 import Tooltip from '@material-ui/core/Tooltip';
 import GitHubIcon from '@material-ui/icons/GitHub';
+import { Divider } from '@material-ui/core';
 import Link from '@material-ui/core/Link';
 
 const useStyles = makeStyles((theme) => ({
@@ -114,6 +115,13 @@ export const KafkaToolbar: React.SFC<Props> = (props) => {
                 open={menuOpen}
                 onClose={closeMenu}
               >
+                <Link href="/" color="inherit">
+                  <MenuItem>Kafka (topics)</MenuItem>
+                </Link>
+                <Link href="/schema-registry/subjects" color="inherit">
+                  <MenuItem>Schema-Registry (subjects)</MenuItem>
+                </Link>
+                <Divider/>
                 <Link href="/messages-cross-topics" color="inherit">
                   <MenuItem><SearchIcon /> Search across topics</MenuItem>
                 </Link>
