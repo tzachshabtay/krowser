@@ -118,6 +118,9 @@ export const KafkaToolbar: React.SFC<Props> = (props) => {
                 <Link href="/" color="inherit">
                   <MenuItem>Kafka (topics)</MenuItem>
                 </Link>
+                <Link href="/brokers" color="inherit">
+                  <MenuItem>Kafka (brokers)</MenuItem>
+                </Link>
                 <Link href="/schema-registry/subjects" color="inherit">
                   <MenuItem>Schema-Registry (subjects)</MenuItem>
                 </Link>

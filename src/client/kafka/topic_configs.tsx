@@ -31,7 +31,7 @@ export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: s
     async componentDidMount() {
         const response = await fetch(`/api/topic/${this.props.match.params.topic}/config`)
         const data = await response.json()
-        const results = data.config.resources[0].configEntries
+        const results = data.resources[0].configEntries
         this.setState({ data, loading: false, rows: results })
     }
 

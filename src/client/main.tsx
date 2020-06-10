@@ -5,6 +5,7 @@ import { Topics } from "./kafka/topics"
 import { Partitions } from "./kafka/partitions"
 import { Messages } from "./kafka/messages/messages"
 import { TopicConfigs } from "./kafka/topic_configs"
+import { Brokers } from "./kafka/brokers"
 import { Subjects } from "./schema-registry/subjects"
 import { Versions } from "./schema-registry/versions"
 
@@ -20,6 +21,7 @@ const App = () => {
 				<Route path="/topic/messages/:topic/:partition" component={Messages} />
 				<Route path="/topic/messages/:topic" exact component={Messages} />
 				<Route path="/messages-cross-topics" exact component={Messages} />
+				<Route path="/brokers" exact component={Brokers} />
 				<Route path="/schema-registry/subjects" exact component={Subjects} />
 				<Route path="/schema-registry/versions/:subject" exact component={Versions} />
 			</div>
