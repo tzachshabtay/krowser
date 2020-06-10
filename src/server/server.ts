@@ -51,7 +51,6 @@ app.get("/api/groups", async (req, res) => {
 })
 
 app.get("/api/members/:group", async (req, res) => {
-	console.log(req.params.group)
 	const groups = await admin.describeGroups([req.params.group]) as any //https://github.com/tulios/kafkajs/issues/756
 	res.status(200).json(groups.groups[0].members)
 })
