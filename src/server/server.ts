@@ -43,11 +43,17 @@ app.get("/api/topic/:topic/config", async (req, res) => {
 	res.status(200).json(config)
 })
 
-app.get("/api/consumer_groups", async (req, res) => {
+app.get("/api/groups", async (req, res) => {
 	const consumers = await admin.listGroups()
-	const ids = consumers.groups.filter(g => g.protocolType === `consumer`).map(g => g.groupId)
+	const ids = consumers.groups.map(g => g.groupId)
 	const groups = await admin.describeGroups(ids)
 	res.status(200).json(groups)
+})
+
+app.get("/api/members/:group", async (req, res) => {
+	console.log(req.params.group)
+	const groups = await admin.describeGroups([req.params.group]) as any //https://github.com/tulios/kafkajs/issues/756
+	res.status(200).json(groups.groups[0].members)
 })
 
 app.get("/api/cluster", async (req, res) => {
