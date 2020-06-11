@@ -41,7 +41,7 @@ export class Brokers extends React.Component<RouteComponentProps, State> {
                     searchQuery={this.state.search}
                     search={r => r.host.includes(this.state.search)}
                     rows={this.state.rows}
-                    rawJsonRows={this.state.data}
+                    raw={this.state.data}
                     columnDefs={this.getColumnDefs()}>
                 </DataView>}
             </>

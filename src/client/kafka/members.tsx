@@ -39,7 +39,7 @@ export class Members extends React.Component<RouteComponentProps<{ group: string
                     searchQuery={this.state.search}
                     search={r => r.memberId.includes(this.state.search) || r.clientId.includes(this.state.search) || r.clientHost.includes(this.state.search)}
                     rows={this.state.rows}
-                    rawJsonRows={this.state.rows}
+                    raw={this.state.rows}
                     columnDefs={this.getColumnDefs()}>
                 </DataView>}
             </>

@@ -47,7 +47,7 @@ export class Partitions extends React.Component<RouteComponentProps<{ topic: str
                     searchQuery=""
                     search={_ => true}
                     rows={this.state.rows}
-                    rawJsonRows={this.state.rows.map(r => ({topic: r.topic, ...r.raw}))}
+                    raw={this.state.rows.map(r => ({topic: r.topic, ...r.raw}))}
                     columnDefs={this.getColumnDefs()}>
                 </DataView>}
             </>

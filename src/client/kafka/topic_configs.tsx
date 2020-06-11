@@ -48,14 +48,17 @@ export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: s
     render() {
         return (
             <>
-                <KafkaToolbar title={`Configs for topic: ${this.props.match.params.topic}`}>
+                <KafkaToolbar
+                    title={`Configs for topic: ${this.props.match.params.topic}`}
+                    onSearch={e => this.setState({ search: e.target.value })}
+                >
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
                 {!this.state.loading && <DataView
                     searchQuery={this.state.search}
                     search={r => r.configName.includes(this.state.search)}
                     rows={this.state.rows}
-                    rawJsonRows={this.state.data}
+                    raw={this.state.data}
                     columnDefs={this.getColumnDefs()}>
                 </DataView>}
             </>

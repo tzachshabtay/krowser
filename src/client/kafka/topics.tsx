@@ -87,7 +87,7 @@ export class Topics extends React.Component<RouteComponentProps, State> {
                     searchQuery={this.state.search}
                     search={r => r.topic.includes(this.state.search)}
                     rows={this.state.rows}
-                    rawJsonRows={this.state.rows.map(r => ({...r.raw, num_messages: r.num_messages, offsets: r.offsets, config: r.config }))}
+                    raw={this.state.rows.map(r => ({...r.raw, num_messages: r.num_messages, offsets: r.offsets, config: r.config }))}
                     columnDefs={this.getColumnDefs()}
                     ref={r => {if (r) this.grid = r;}}
                     >
