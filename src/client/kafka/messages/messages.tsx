@@ -178,7 +178,7 @@ export class Messages extends React.Component<Props, State> {
                     search={r => r.rowValue.includes(this.state.search) || r.rowKey.includes(this.state.search)}
                     searchQuery={this.state.search}
                     rows={this.state.rows}
-                    jsonRows={this.state.rows.map(r => r.rowJson)}
+                    rawJsonRows={this.state.rows.map(r => r.rowJson)}
                     columnDefs={this.getColumnDefs()}
                     onGridReady={this.onGridReady}
                     onFilterChanged={this.onFilterChanged}

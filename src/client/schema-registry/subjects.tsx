@@ -66,7 +66,7 @@ export class Subjects extends React.Component<RouteComponentProps, State> {
                     searchQuery={this.state.search}
                     search={r => r.subject.includes(this.state.search)}
                     rows={this.state.rows}
-                    jsonRows={this.state.rows.map(r => ({subject: r.subject, versions: r.versions}))}
+                    rawJsonRows={this.state.rows.map(r => ({subject: r.subject, versions: r.versions}))}
                     columnDefs={this.getColumnDefs()}
                     ref={r => {if (r) this.grid = r;}}
                     >

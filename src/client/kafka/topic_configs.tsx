@@ -55,7 +55,7 @@ export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: s
                     searchQuery={this.state.search}
                     search={r => r.configName.includes(this.state.search)}
                     rows={this.state.rows}
-                    jsonRows={this.state.data}
+                    rawJsonRows={this.state.data}
                     columnDefs={this.getColumnDefs()}>
                 </DataView>}
             </>

@@ -105,7 +105,7 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
                     searchQuery={this.state.search}
                     search={r => r.schema.includes(this.state.search)}
                     rows={this.state.rows}
-                    jsonRows={this.state.rows.map(r => ({version: r.version, schema: r.schema}))}
+                    rawJsonRows={this.state.rows.map(r => ({version: r.version, schema: r.schema}))}
                     columnDefs={this.getColumnDefs()}
                     ref={r => {if (r) this.grid = r;}}
                     >

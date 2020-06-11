@@ -51,7 +51,7 @@ export class Groups extends React.Component<RouteComponentProps, State> {
                     searchQuery={this.state.search}
                     search={r => r.groupId.includes(this.state.search) || r.protocol.includes(this.state.search) || r.protocolType.includes(this.state.search)}
                     rows={this.state.rows}
-                    jsonRows={this.state.rows.map(r => r.raw)}
+                    rawJsonRows={this.state.rows.map(r => r.raw)}
                     columnDefs={this.getColumnDefs()}>
                 </DataView>}
             </>

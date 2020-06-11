@@ -4,12 +4,12 @@ import CardContent from '@material-ui/core/CardContent';
 import ReactJson from 'react-json-view';
 
 export interface CardViewProps {
-    jsonRows: any[];
+    rawJsonRows: any[];
     searchQuery: string;
 }
 
 export const CardView: React.SFC<CardViewProps> = (props) => {
-    let rows = props.jsonRows;
+    let rows = props.rawJsonRows;
     if (props.searchQuery) {
         rows = rows.filter(r => JSON.stringify(r).includes(props.searchQuery))
     }
