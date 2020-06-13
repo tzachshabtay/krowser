@@ -75,14 +75,14 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 			const maxOffset = parseInt(partitionOffsets.high)
 			if (maxOffset === 0 || offset > maxOffset) {
 				res.status(200).json([])
-				break
+				return
 			}
 			if (offset + limit > maxOffset) {
 				limit = maxOffset - offset
 			}
 			const messages = await getMessages({topic, partition, limit, offset, search})
 			res.status(200).json(messages)
-			break
+			return
 		}
 		res.status(404).json(`partition ${partition} not found for topic ${topic}`)
 	}
