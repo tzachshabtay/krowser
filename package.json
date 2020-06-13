@@ -33,6 +33,7 @@
   "dependencies": {
     "@material-ui/core": "^4.10.1",
     "@material-ui/icons": "^4.9.1",
+    "@material-ui/lab": "^4.0.0-alpha.56",
     "@ovotech/avro-kafkajs": "^0.3.0",
     "@types/long": "^4.0.1",
     "ag-grid-community": "^23.2.0",

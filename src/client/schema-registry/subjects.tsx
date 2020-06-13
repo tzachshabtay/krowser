@@ -4,7 +4,7 @@ import { KafkaToolbar} from '../common/toolbar';
 import { DataView} from '../common/data_view';
 import { RouteComponentProps } from "react-router-dom";
 import { CellProps, CellButton } from '../common/cell_button';
-
+import { GridApi, ColumnApi, GridReadyEvent } from 'ag-grid-community';
 
 type State = {
     search: string;
@@ -20,7 +20,13 @@ class ViewVersionsButton extends React.Component<CellProps, {}> {
 
 export class Subjects extends React.Component<RouteComponentProps, State> {
     state: State = { search: "", loading: true, rows: [] }
-    grid: DataView | undefined = undefined;
+    gridApi: GridApi | null = null;
+    columnApi: ColumnApi | null = null;
+
+    onGridReady = (params: GridReadyEvent) => {
+        this.gridApi = params.api;
+        this.columnApi = params.columnApi;
+    }
 
     async componentDidMount() {
         const response = await fetch(`/api/schema-registry/subjects`)
@@ -38,11 +44,8 @@ export class Subjects extends React.Component<RouteComponentProps, State> {
         const data = await response.json()
         subject.num_versions = data.length
         subject.versions = data
-        if (this.grid) {
-            const api = this.grid.GetGridApi()
-            if (api) {
-                api.refreshCells()
-            }
+        if (this.gridApi) {
+            this.gridApi.refreshCells()
         }
         this.forceUpdate();
     }
@@ -68,7 +71,7 @@ export class Subjects extends React.Component<RouteComponentProps, State> {
                     rows={this.state.rows}
                     raw={this.state.rows.map(r => ({subject: r.subject, versions: r.versions}))}
                     columnDefs={this.getColumnDefs()}
-                    ref={r => {if (r) this.grid = r;}}
+                    onGridReady={this.onGridReady}
                     >
                 </DataView>}
             </>

@@ -4,6 +4,8 @@ import { KafkaToolbar} from '../common/toolbar';
 import { DataView} from '../common/data_view';
 import { RouteComponentProps } from "react-router-dom";
 import { CellProps, CellButton } from '../common/cell_button';
+import { GridApi, ColumnApi, GridReadyEvent } from 'ag-grid-community';
+
 
 
 type State = {
@@ -32,7 +34,13 @@ class ViewMessagesButton extends React.Component<CellProps, {}> {
 
 export class Topics extends React.Component<RouteComponentProps, State> {
     state: State = { search: "", loading: true, rows: [] }
-    grid: DataView | undefined = undefined;
+    gridApi: GridApi | null = null;
+    columnApi: ColumnApi | null = null;
+
+    onGridReady = (params: GridReadyEvent) => {
+        this.gridApi = params.api;
+        this.columnApi = params.columnApi;
+    }
 
     async componentDidMount() {
         const response = await fetch(`/api/topics`)
@@ -57,11 +65,8 @@ export class Topics extends React.Component<RouteComponentProps, State> {
         topic.config = data.config
         topic.num_messages = sum
         topic.num_configs = data.config.resources[0].configEntries.length
-        if (this.grid) {
-            const api = this.grid.GetGridApi()
-            if (api) {
-                api.refreshCells()
-            }
+        if (this.gridApi) {
+            this.gridApi.refreshCells()
         }
         this.forceUpdate();
     }
@@ -89,7 +94,7 @@ export class Topics extends React.Component<RouteComponentProps, State> {
                     rows={this.state.rows}
                     raw={this.state.rows.map(r => ({...r.raw, num_messages: r.num_messages, offsets: r.offsets, config: r.config }))}
                     columnDefs={this.getColumnDefs()}
-                    ref={r => {if (r) this.grid = r;}}
+                    onGridReady={this.onGridReady}
                     >
                 </DataView>}
             </>

@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { GridProps, Grid } from "./grid";
 import Tabs from '@material-ui/core/Tabs';
 import Tab from '@material-ui/core/Tab';
 import Typography from '@material-ui/core/Typography';
 import Box from '@material-ui/core/Box';
 import { CardView, CardViewProps } from "./card_view";
-import { GridApi } from 'ag-grid-community';
+import { useTheme } from './theme_hook';
 
 interface DataViewProps extends GridProps, CardViewProps {
 }
@@ -40,37 +40,30 @@ function TabPanel(props: TabPanelProps) {
     );
 }
 
-export class DataView extends React.Component<DataViewProps> {
-    state: State = { value: 0 };
-    grid: Grid | undefined = undefined;
+export const DataView: React.SFC<DataViewProps> = (props) => {
+    const [tab, setTab] = useState(0)
 
-    GetGridApi = (): GridApi | null => {
-        if (this.grid) {
-            return this.grid.GetGridApi()
-        }
-        return null
-    }
-
-    handleChange = (_: any, newValue: number) => {
-        this.setState({value: newValue})
+    const handleTabChange = (_: any, newValue: number) => {
+        setTab(newValue)
     };
 
-    render () {
-        return (
-            <>
-            <Tabs value={this.state.value} onChange={this.handleChange} aria-label="raw or grid mode selection"
-            indicatorColor="primary"
-            textColor="primary">
-                <Tab label="Grid"></Tab>
-                <Tab label="Raw"></Tab>
-            </Tabs>
-            <TabPanel value={this.state.value} index={0}>
-                <Grid {...this.props} ref={r => {if (r) this.grid = r;}}></Grid>
-            </TabPanel>
-            <TabPanel value={this.state.value} index={1}>
-                <CardView {...this.props}></CardView>
-            </TabPanel>
-            </>
-        )
-    }
+    const { theme, _ } = useTheme()
+    const tabColor = theme === `dark` ? `secondary` : `primary`
+
+    return (
+        <>
+        <Tabs value={tab} onChange={handleTabChange} aria-label="raw or grid mode selection"
+        indicatorColor={tabColor}
+        textColor={tabColor}>
+            <Tab label="Grid"></Tab>
+            <Tab label="Raw"></Tab>
+        </Tabs>
+        <TabPanel value={tab} index={0}>
+            <Grid {...props}></Grid>
+        </TabPanel>
+        <TabPanel value={tab} index={1}>
+            <CardView {...props}></CardView>
+        </TabPanel>
+        </>
+    )
 }

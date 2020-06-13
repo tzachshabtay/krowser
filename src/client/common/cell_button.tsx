@@ -1,6 +1,7 @@
 import React from "react";
 import Button from '@material-ui/core/Button';
 import EventNote from '@material-ui/icons/EventNote';
+import { useTheme } from './theme_hook';
 
 export interface CellProps {
     value?: number;
@@ -11,20 +12,20 @@ export interface CellButtonProps extends CellProps {
     getUrl: () => string;
 }
 
-export class CellButton extends React.Component<CellButtonProps, {}> {
-    render() {
-        let msg = "Loading"
-        if (this.props.value || this.props.value === 0) {
-            msg = this.props.value.toString()
-        }
-        return (
-            <div style={{ width: "100%", justifyContent: 'left', textAlign: "left", marginTop: -3 }}>
-                <Button color="primary" size="small" style={{ justifyContent: 'left', textAlign: "left" }}
-                    onClick={() => { this.props.data.history.push(this.props.getUrl()) }}>
-                    <EventNote />
-                    {msg}
-                </Button>
-            </div>
-        )
+export const CellButton: React.SFC<CellButtonProps> = (props) => {
+    let msg = "Loading"
+    if (props.value || props.value === 0) {
+        msg = props.value.toString()
     }
+    const { theme, _ } = useTheme()
+    const buttonColor = theme === `dark` ? `secondary` : `primary`
+    return (
+        <div style={{ width: "100%", justifyContent: 'left', textAlign: "left", marginTop: -3 }}>
+            <Button color={buttonColor} size="small" style={{ justifyContent: 'left', textAlign: "left" }}
+                onClick={() => { props.data.history.push(props.getUrl()) }}>
+                <EventNote />
+                {msg}
+            </Button>
+        </div>
+    )
 }

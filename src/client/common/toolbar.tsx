@@ -13,6 +13,11 @@ import Tooltip from '@material-ui/core/Tooltip';
 import GitHubIcon from '@material-ui/icons/GitHub';
 import { Divider } from '@material-ui/core';
 import Link from '@material-ui/core/Link';
+import { useTheme } from './theme_hook';
+import ToggleButton from '@material-ui/lab/ToggleButton';
+import ToggleButtonGroup from '@material-ui/lab/ToggleButtonGroup';
+import WbSunnyIcon from '@material-ui/icons/WbSunny';
+import NightsStayIcon from '@material-ui/icons/NightsStay';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -69,6 +74,32 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
+const ThemeToggle: React.SFC = () => {
+  const {theme, saveTheme} = useTheme()
+
+  const handleTheme = (event: React.MouseEvent<HTMLElement>, newTheme: string) => {
+    if (newTheme !== null) {
+      saveTheme(newTheme)
+    }
+  };
+
+  return (
+    <ToggleButtonGroup
+      value={theme}
+      exclusive
+      onChange={handleTheme}
+      aria-label="theme selector"
+    >
+      <ToggleButton value="light" aria-label="light theme">
+        <WbSunnyIcon htmlColor="white" />
+      </ToggleButton>
+      <ToggleButton value="dark" aria-label="dark theme">
+        <NightsStayIcon htmlColor="white" />
+      </ToggleButton>
+    </ToggleButtonGroup>
+  );
+}
+
 interface Props {
     title: string;
     onSearch?: React.ChangeEventHandler<HTMLTextAreaElement | HTMLInputElement>;
@@ -76,20 +107,22 @@ interface Props {
 
 export const KafkaToolbar: React.SFC<Props> = (props) => {
   const classes = useStyles();
+  const {theme, _} = useTheme();
   const [anchorElement, setAnchorElement] = React.useState(null);
-  const menuOpen = Boolean(anchorElement);
 
+  const menuOpen = Boolean(anchorElement);
   const openMenu = (event: any) => {
     setAnchorElement(event.currentTarget);
   };
-
   const closeMenu = () => {
     setAnchorElement(null);
   };
 
+  const barColor = theme === `light` ? `primary` : `default`
+
   return (
     <div className={classes.root}>
-      <AppBar position="sticky">
+      <AppBar position="sticky" color={barColor}>
         <Toolbar>
           <IconButton
             edge="start"
@@ -140,6 +173,7 @@ export const KafkaToolbar: React.SFC<Props> = (props) => {
           <Typography className={classes.title} variant="h6" noWrap>
             {props.title}
           </Typography>
+          <ThemeToggle/>
           {props.onSearch && (
             <div className={classes.search}>
                 <div className={classes.searchIcon}>

@@ -3,6 +3,7 @@ import CircularProgress from '@material-ui/core/CircularProgress';
 import { KafkaToolbar} from '../common/toolbar';
 import { DataView} from '../common/data_view';
 import { RouteComponentProps } from "react-router-dom";
+import { GridApi, ColumnApi, GridReadyEvent } from 'ag-grid-community';
 
 
 type State = {
@@ -14,7 +15,13 @@ type State = {
 
 export class Versions extends React.Component<RouteComponentProps<{ subject: string }>, State> {
     state: State = { search: "", loading: true, rows: [], customCols: {cols: {}} }
-    grid: DataView | undefined = undefined;
+    gridApi: GridApi | null = null;
+    columnApi: ColumnApi | null = null;
+
+    onGridReady = (params: GridReadyEvent) => {
+        this.gridApi = params.api;
+        this.columnApi = params.columnApi;
+    }
 
     async componentDidMount() {
         const response = await fetch(`/api/schema-registry/versions/${this.props.match.params.subject}`)
@@ -34,11 +41,8 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
         const data = await response.json()
         version.schema = data
         this.addToRow(version, data, customCols, "")
-        if (this.grid) {
-            const api = this.grid.GetGridApi()
-            if (api) {
-                api.refreshCells()
-            }
+        if (this.gridApi) {
+            this.gridApi.refreshCells()
         }
         this.forceUpdate();
     }
@@ -107,7 +111,7 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
                     rows={this.state.rows}
                     raw={this.state.rows.map(r => ({version: r.version, schema: r.schema}))}
                     columnDefs={this.getColumnDefs()}
-                    ref={r => {if (r) this.grid = r;}}
+                    onGridReady={this.onGridReady}
                     >
                 </DataView>}
             </>

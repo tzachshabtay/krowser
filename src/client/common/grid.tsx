@@ -1,8 +1,10 @@
 import React from "react";
 import { AgGridReact } from 'ag-grid-react';
-import { GridReadyEvent, GridApi, ColumnApi, ColDef, FilterChangedEvent } from 'ag-grid-community';
+import { GridReadyEvent, ColDef, FilterChangedEvent } from 'ag-grid-community';
+import { useTheme } from './theme_hook'
 
 import 'ag-grid-community/dist/styles/ag-grid.css';
+import 'ag-grid-community/dist/styles/ag-theme-alpine-dark.css';
 import 'ag-grid-community/dist/styles/ag-theme-alpine.css';
 
 export interface GridProps {
@@ -14,39 +16,24 @@ export interface GridProps {
     onFilterChanged?(event: FilterChangedEvent): void;
 }
 
-export class Grid extends React.Component<GridProps> {
-    api: GridApi | null = null;
-    columnApi: ColumnApi | null = null;
-
-    GetGridApi = (): GridApi | null => {
-        return this.api
+export const Grid: React.SFC<GridProps> = (props) => {
+    let rows = props.rows
+    if (props.searchQuery) {
+        rows = rows.filter(props.search)
     }
-
-    onGridReady = (params: GridReadyEvent) => {
-        this.api = params.api;
-        this.columnApi = params.columnApi;
-        if (this.props.onGridReady) {
-            this.props.onGridReady(params)
-        }
-    }
-
-    render() {
-        let rows = this.props.rows
-        if (this.props.searchQuery) {
-            rows = rows.filter(this.props.search)
-        }
-        return (
-            <div className="ag-theme-alpine">
-                <AgGridReact
-                    columnDefs={this.props.columnDefs}
-                    rowData={rows}
-                    domLayout='autoHeight'
-                    defaultColDef={{ sortable: true, filter: true, resizable: true }}
-                    onGridReady={this.onGridReady}
-                    onFilterChanged={this.props.onFilterChanged}
-                >
-                </AgGridReact>
-            </div>
-        )
-    }
+    const { theme, _ } = useTheme()
+    const cssTheme = theme === `dark` ? `ag-theme-alpine-dark` : `ag-theme-alpine`
+    return (
+        <div className={cssTheme}>
+            <AgGridReact
+                columnDefs={props.columnDefs}
+                rowData={rows}
+                domLayout='autoHeight'
+                defaultColDef={{ sortable: true, filter: true, resizable: true }}
+                onGridReady={props.onGridReady}
+                onFilterChanged={props.onFilterChanged}
+            >
+            </AgGridReact>
+        </div>
+    )
 }

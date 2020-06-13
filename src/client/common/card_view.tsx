@@ -1,6 +1,5 @@
 import React from "react";
-import Card from '@material-ui/core/Card';
-import CardContent from '@material-ui/core/CardContent';
+import { useTheme } from './theme_hook';
 import ReactJson from 'react-json-view';
 
 export interface CardViewProps {
@@ -13,12 +12,10 @@ export const CardView: React.SFC<CardViewProps> = (props) => {
     if (props.searchQuery) {
         raw = filterJson(props.raw, props.searchQuery)
     }
+    const { theme, _ } = useTheme()
+    const jsonTheme = theme === `dark` ? `twilight` : undefined
     return (
-        <Card>
-            <CardContent>
-                <ReactJson src={raw} />
-            </CardContent>
-        </Card>
+        <ReactJson src={raw} theme={jsonTheme} style={{padding: 10, border: "solid gray"}} />
     )
 }
 
