@@ -1,8 +1,9 @@
 import React from "react";
 import CircularProgress from '@material-ui/core/CircularProgress';
-import { KafkaToolbar} from '../common/toolbar';
-import { DataView} from '../common/data_view';
+import { KafkaToolbar } from '../common/toolbar';
+import { DataView } from '../common/data_view';
 import { RouteComponentProps } from "react-router-dom";
+import { useTheme } from '../common/theme_hook';
 import Link from '@material-ui/core/Link';
 
 type State = {
@@ -16,13 +17,13 @@ export interface TopicConfigLinkProps {
     data: { configName: string };
 }
 
-class TopicConfigLink extends React.Component<TopicConfigLinkProps, {}> {
-    render() {
-        return (
-        <Link rel="noopener noreferrer" target="_blank" href={`https://docs.confluent.io/current/installation/configuration/topic-configs.html#${this.props.data.configName}`}>
-                    {this.props.data.configName}
-        </Link>)
-    }
+const TopicConfigLink: React.SFC<TopicConfigLinkProps> = (props) => {
+    const { theme, _ } = useTheme()
+    const color = theme === `dark` ? `secondary` : undefined
+    return (
+    <Link rel="noopener noreferrer" color={color} target="_blank" href={`https://docs.confluent.io/current/installation/configuration/topic-configs.html#${props.data.configName}`}>
+                {props.data.configName}
+    </Link>)
 }
 
 export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: string }>, State> {
