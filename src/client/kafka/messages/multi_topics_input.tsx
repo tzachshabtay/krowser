@@ -13,6 +13,7 @@ import { GoButton } from './go_button';
 interface Props {
     search: string;
     onDataFetched: (data: any) => void;
+    onDataFetchStarted: () => void;
 }
 
 type State = {
@@ -41,6 +42,7 @@ export class MultiTopicsInput extends React.Component<Props, State> {
 
     async fetchMessages() {
         this.setState({ loadingMessages: true })
+        this.props.onDataFetchStarted()
         const topics = this.state.selectedTopics.join(`,`)
         const response = await fetch(`/api/messages-cross-topics/${topics}?limit=${this.state.limit}&search_from=${this.state.searchFrom}&search=${this.props.search}`)
         const data = await response.json()

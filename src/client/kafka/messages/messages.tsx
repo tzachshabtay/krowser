@@ -144,6 +144,10 @@ export class Messages extends React.Component<Props, State> {
         return `${month}/${day}/${year} ${hour}:${minute}:${second}.${millis}`
     }
 
+    onDataFetchStarted = () => {
+        this.setState({error: "", warning: ""})
+    }
+
     onDataFetched = (data: any) => {
         console.log(data)
         if (data.error) {
@@ -180,13 +184,18 @@ export class Messages extends React.Component<Props, State> {
                 <br />
                 { this.props.match.params.topic === undefined ?
                 (
-                    <MultiTopicsInput onDataFetched={this.onDataFetched} search={this.state.search}></MultiTopicsInput>
+                    <MultiTopicsInput
+                        onDataFetched={this.onDataFetched}
+                        onDataFetchStarted={this.onDataFetchStarted}
+                        search={this.state.search}>
+                    </MultiTopicsInput>
                 ) : (
                     <SingleTopicInput
                         topic={this.props.match.params.topic}
                         partition={this.props.match.params.partition}
                         search={this.state.search}
-                        onDataFetched={this.onDataFetched}>
+                        onDataFetched={this.onDataFetched}
+                        onDataFetchStarted={this.onDataFetchStarted}>
                     </SingleTopicInput>
                 )}
                 { this.state.warning && (<Alert severity="warning">{this.state.warning}</Alert>)}

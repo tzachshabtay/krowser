@@ -13,6 +13,7 @@ interface Props {
     partition?: string;
     search: string;
     onDataFetched: (data: any) => void;
+    onDataFetchStarted: () => void;
 }
 
 type State = {
@@ -74,6 +75,7 @@ export class SingleTopicInput extends React.Component<Props, State> {
 
     async fetchMessages() {
         this.setState({ loadingMessages: true })
+        this.props.onDataFetchStarted()
         const topic = this.props.topic
         const response = await fetch(`/api/messages/${topic}/${this.state.partition}?limit=${this.state.limit}&offset=${this.state.offset}&search=${this.props.search}`)
         const data = await response.json()
