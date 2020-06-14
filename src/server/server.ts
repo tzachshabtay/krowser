@@ -6,6 +6,7 @@ import { SchemaRegistry } from '@ovotech/avro-kafkajs';
 import { Type } from "avsc";
 import { v4 as uuidv4 } from 'uuid';
 import { KAFKA_URL, SCHEMA_REGISTRY_URL } from "./config";
+import { ImageControlPointDuplicate } from "material-ui/svg-icons";
 
 type MessageInfo = { topic: string, partition: number, value: string, key: string, message: KafkaMessage, schemaType: Type | undefined }
 
@@ -164,6 +165,7 @@ const getMessages = async (input: TopicQueryInput): Promise<MessageInfo[]> => {
 	const messages: MessageInfo[] = []
 	let numConsumed = 0
 	console.log(`Querying topic ${input.topic} (partition ${input.partition}) at offset=${input.offset}, limit=${input.limit}`)
+	const latestOffset = input.offset + input.limit - 1
 	consumer.subscribe({ topic: input.topic, fromBeginning: true })
 	const consumed: Set<string> = new Set<string>();
 	const p = new Promise<void>(async (resolve, reject) => {
@@ -203,8 +205,14 @@ const getMessages = async (input: TopicQueryInput): Promise<MessageInfo[]> => {
 				}
 				consumed.add(message.offset)
 
-				if (parseInt(message.offset) < input.offset) {
-					console.log(`Ignoring message from an old offset: ${message.offset} (expecting at least ${input.offset})`)
+				const offset = parseInt(message.offset)
+				if (offset < input.offset) {
+					console.log(`Ignoring message from an old offset: ${offset} (expecting at least ${input.offset})`)
+					return
+				}
+				if (offset > latestOffset) {
+					console.log(`Got too late message (offset: ${offset}, expecting ${input.offset} - ${latestOffset}), stopping...`)
+					resolve()
 					return
 				}
 				numConsumed++
