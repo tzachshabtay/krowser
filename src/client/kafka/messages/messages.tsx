@@ -4,7 +4,7 @@ import { KafkaToolbar} from '../../common/toolbar';
 import { DataView} from '../../common/data_view';
 import { SingleTopicInput} from './single_topic_input';
 import { MultiTopicsInput} from './multi_topics_input';
-import Typography from '@material-ui/core/Typography';
+import Alert from '@material-ui/lab/Alert';
 import { GridReadyEvent, GridApi, ColumnApi, FilterChangedEvent } from 'ag-grid-community';
 
 interface Props extends RouteComponentProps<{ topic?: string, partition?: string }> {
@@ -14,11 +14,12 @@ type State = {
     search: string;
     rows: any[];
     error: string;
+    warning: string;
     customCols: {cols: {}};
 }
 
 export class Messages extends React.Component<Props, State> {
-    state: State = { search: "", rows: [], customCols: {cols: {}}, error: "" }
+    state: State = { search: "", rows: [], customCols: {cols: {}}, error: "", warning: "" }
     api: GridApi | null = null;
     columnApi: ColumnApi | null = null;
 
@@ -152,16 +153,16 @@ export class Messages extends React.Component<Props, State> {
         }
         const customCols = {cols: {}}
         const rows = data.messages.map((d: any) => this.getRow(d, customCols))
-        let error = ""
+        let warning = ""
         if (data.hasTimeout) {
             if (this.props.match.params.topic === undefined) {
-                error = `Some messages may be missing as one or more topics timed out`
+                warning = `Some messages may (or may not) be missing as one or more topics timed out`
             } else {
-                error = `Some messages may be missing as the topic timed out`
+                warning = `Some messages may (or may not) be missing as the topic timed out`
             }
         }
         this.setState({
-            rows, customCols, error
+            rows, customCols, warning
         })
     }
 
@@ -185,7 +186,8 @@ export class Messages extends React.Component<Props, State> {
                         onDataFetched={this.onDataFetched}>
                     </SingleTopicInput>
                 )}
-                { this.state.error && (<Typography color="error">{this.state.error}</Typography>)}
+                { this.state.warning && (<Alert severity="warning">{this.state.warning}</Alert>)}
+                { this.state.error && (<Alert severity="error">{this.state.error}</Alert>)}
                 <DataView
                     search={r => r.rowValue.includes(this.state.search) || r.rowKey.includes(this.state.search)}
                     searchQuery={this.state.search}
