@@ -157,7 +157,8 @@ const getTopicConfig = async (topic: string) :Promise<DescribeConfigResponse> =>
 }
 
 const getMessages = async (input: TopicQueryInput): Promise<MessageInfo[]> => {
-	const consumer = kafka.consumer({ groupId: `kafka-browser-${Date.now()}=${uuidv4()}` })
+	const groupId = `kafka-browser-${Date.now()}=${uuidv4()}`
+	const consumer = kafka.consumer({ groupId })
 	await consumer.connect()
 
 	const messages: MessageInfo[] = []
@@ -231,6 +232,8 @@ const getMessages = async (input: TopicQueryInput): Promise<MessageInfo[]> => {
 	}
 	finally {
 		consumer.stop()
+		const res = await admin.deleteGroups([groupId])
+		console.log(`Delete consumer group ${res[0].groupId} result: ${res[0].errorCode || "success"}`)
 	}
 }
 
