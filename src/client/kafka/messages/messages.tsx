@@ -143,13 +143,25 @@ export class Messages extends React.Component<Props, State> {
     onDataFetched = (data: any) => {
         console.log(data)
         if (data.error) {
-            this.setState({error: `Failed to fetch data. Error: ${data.error}`})
+            let errorMsg = data.error
+            if (typeof errorMsg === `object`) {
+                errorMsg = JSON.stringify(data.error)
+            }
+            this.setState({error: `Failed to fetch data. Error: ${errorMsg}`})
             return
         }
         const customCols = {cols: {}}
-        const rows = data.map((d: any) => this.getRow(d, customCols))
+        const rows = data.messages.map((d: any) => this.getRow(d, customCols))
+        let error = ""
+        if (data.hasTimeout) {
+            if (this.props.match.params.topic === undefined) {
+                error = `Some messages may be missing as one or more topics timed out`
+            } else {
+                error = `Some messages may be missing as the topic timed out`
+            }
+        }
         this.setState({
-            rows, customCols, error: ""
+            rows, customCols, error
         })
     }
 

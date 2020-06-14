@@ -6,9 +6,10 @@ import { SchemaRegistry } from '@ovotech/avro-kafkajs';
 import { Type } from "avsc";
 import { v4 as uuidv4 } from 'uuid';
 import { KAFKA_URL, SCHEMA_REGISTRY_URL } from "./config";
-import { ImageControlPointDuplicate } from "material-ui/svg-icons";
 
 type MessageInfo = { topic: string, partition: number, value: string, key: string, message: KafkaMessage, schemaType: Type | undefined }
+
+type MessagesResult = { messages: MessageInfo[], hasTimeout: boolean }
 
 type TopicQueryInput = { topic: string, partition: number, limit: number, offset: number, search: string}
 
@@ -101,6 +102,7 @@ app.get("/api/messages-cross-topics/:topics", async (req, res) => {
 		const search = req.query.search ? req.query.search.toString() : ""
 		let messages: MessageInfo[] = []
 		const topics = req.params.topics.split(`,`)
+		let hasTimeout = false
 		for (const topic of topics) {
 			const partitions = await admin.fetchTopicOffsets(topic)
 			for (const partition of partitions) {
@@ -113,12 +115,13 @@ app.get("/api/messages-cross-topics/:topics", async (req, res) => {
 				let partitionLimit = offset + limit > high ? high - offset : limit
 				console.log(`Getting messages for topic ${topic}, partition ${partition.partition}`)
 				const partitionMessages = await getMessages({topic, partition: partition.partition, limit: partitionLimit, offset, search })
-				console.log(`Done getting messages for topic ${topic}, partition ${partition.partition} (#${partitionMessages.length})`)
-				messages = messages.concat(partitionMessages)
+				console.log(`Done getting messages for topic ${topic}, partition ${partition.partition} (#${partitionMessages.messages.length}, timeout = ${partitionMessages.hasTimeout})`)
+				messages = messages.concat(partitionMessages.messages)
+				hasTimeout = hasTimeout || partitionMessages.hasTimeout
 			}
 		}
 		console.log(`Done getting all messages (#${messages.length})`)
-		res.status(200).json(messages)
+		res.status(200).json({messages, hasTimeout})
 	}
 	catch (error) {
 		console.error(`Error getting all messages: ${error}`)
@@ -157,7 +160,7 @@ const getTopicConfig = async (topic: string) :Promise<DescribeConfigResponse> =>
 	})
 }
 
-const getMessages = async (input: TopicQueryInput): Promise<MessageInfo[]> => {
+const getMessages = async (input: TopicQueryInput): Promise<MessagesResult> => {
 	const groupId = `kafka-browser-${Date.now()}=${uuidv4()}`
 	const consumer = kafka.consumer({ groupId })
 	await consumer.connect()
@@ -165,12 +168,13 @@ const getMessages = async (input: TopicQueryInput): Promise<MessageInfo[]> => {
 	const messages: MessageInfo[] = []
 	let numConsumed = 0
 	console.log(`Querying topic ${input.topic} (partition ${input.partition}) at offset=${input.offset}, limit=${input.limit}`)
-	const latestOffset = input.offset + input.limit - 1
 	consumer.subscribe({ topic: input.topic, fromBeginning: true })
-	const consumed: Set<string> = new Set<string>();
+	const consumed: Set<string> = new Set<string>()
+	let hasTimeout = false
 	const p = new Promise<void>(async (resolve, reject) => {
 		setTimeout(() => {
-			reject("timeout")
+			hasTimeout = true
+			resolve()
 		}, 20000);
 		await consumer.run({
 			autoCommit: false,
@@ -210,11 +214,6 @@ const getMessages = async (input: TopicQueryInput): Promise<MessageInfo[]> => {
 					console.log(`Ignoring message from an old offset: ${offset} (expecting at least ${input.offset})`)
 					return
 				}
-				if (offset > latestOffset) {
-					console.log(`Got too late message (offset: ${offset}, expecting ${input.offset} - ${latestOffset}), stopping...`)
-					resolve()
-					return
-				}
 				numConsumed++
 				let filteredOut = false
 				if (input.search) {
@@ -236,10 +235,10 @@ const getMessages = async (input: TopicQueryInput): Promise<MessageInfo[]> => {
 	consumer.seek({ topic: input.topic, partition: input.partition, offset: input.offset.toString() })
 	try {
 		await p;
-		return messages
+		return { messages, hasTimeout }
 	}
 	finally {
-		consumer.stop()
+		await consumer.stop()
 		const res = await admin.deleteGroups([groupId])
 		console.log(`Delete consumer group ${res[0].groupId} result: ${res[0].errorCode || "success"}`)
 	}
