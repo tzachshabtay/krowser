@@ -33,25 +33,28 @@ export class Messages extends React.Component<Props, State> {
             rowTopic: data.topic,
             rowPartition: data.partition,
         }
+        let cols = {}
+        let rowValue = data.value
         try {
-            const cols = JSON.parse(data.value)
-            let jsonRow: any = {}
-            for (const col in row) {
-                if (col === "rowValue") {
-                    jsonRow.Value = cols;
-                    continue;
-                }
-                if (col.startsWith("row")) {
-                    jsonRow[col.substring(3)] = row[col];
-                }
-            }
-            row = {...row, ...cols}
-            row.rowJson = jsonRow;
-            customCols.cols = {...customCols.cols, ...cols}
+            cols = JSON.parse(data.value)
+            rowValue = cols
         }
         catch (error) {
-            console.warn(`row is not json encoded, error: ${error}`)
+            console.warn(`row value is not json encoded, error: ${error}, value: ${data.value}`)
         }
+        let jsonRow: any = {}
+        for (const col in row) {
+            if (col === "rowValue") {
+                jsonRow.Value = rowValue;
+                continue;
+            }
+            if (col.startsWith("row")) {
+                jsonRow[col.substring(3)] = row[col];
+            }
+        }
+        row = {...row, ...cols}
+        row.rowJson = jsonRow;
+        customCols.cols = {...customCols.cols, ...cols}
         return row
     }
 
