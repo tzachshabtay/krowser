@@ -47,7 +47,7 @@ const InputField: React.SFC<InputProps> = (props) => {
 
 
 export class SingleTopicInput extends React.Component<Props, State> {
-    state: State = { partitions: [], offset: 0, limit: 10, loadingMessages: false, loadingPartitions: true, partition: this.props.partition || "0" }
+    state: State = { partitions: [], offset: 0, limit: 5, loadingMessages: false, loadingPartitions: true, partition: this.props.partition || "0" }
 
     async componentDidMount() {
         await this.fetchPartitions()
@@ -71,13 +71,30 @@ export class SingleTopicInput extends React.Component<Props, State> {
             }
         }
         this.setState(newState)
+        const partitionIndex = newState.partition || this.props.partition
+        if (partitionIndex !== undefined) {
+            const partition = data.offsets[parseInt(partitionIndex)]
+            let offset = partition.high - this.state.limit
+            if (offset < partition.low) {
+                offset = partition.low
+            }
+            this.setState({offset}, this.fetchMessagesShort)
+        }
     }
 
-    async fetchMessages() {
+    fetchMessagesShort = async () => {
+        await this.fetchMessages(10000)
+    }
+
+    fetchMessagesLong = async () => {
+        await this.fetchMessages(20000)
+    }
+
+    fetchMessages = async (timeout: number) => {
         this.setState({ loadingMessages: true })
         this.props.onDataFetchStarted()
         const topic = this.props.topic
-        const response = await fetch(`/api/messages/${topic}/${this.state.partition}?limit=${this.state.limit}&offset=${this.state.offset}&search=${this.props.search}`)
+        const response = await fetch(`/api/messages/${topic}/${this.state.partition}?limit=${this.state.limit}&offset=${this.state.offset}&search=${this.props.search}&timeout=${timeout}`)
         const data = await response.json()
         this.props.onDataFetched(data)
         this.setState({loadingMessages: false})
@@ -116,7 +133,7 @@ export class SingleTopicInput extends React.Component<Props, State> {
                     />
                     </div>
                     <GoButton
-                        onClick={async () => { await this.fetchMessages() }}
+                        onClick={async () => { await this.fetchMessagesLong() }}
                         isRunning={this.state.loadingMessages}>
                     </GoButton>
             </Toolbar>

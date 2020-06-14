@@ -1,7 +1,7 @@
 import express from "express";
 import http from "http";
 import path from "path";
-import { Kafka, KafkaMessage, ResourceTypes, DescribeConfigResponse } from "kafkajs";
+import { Kafka, KafkaMessage, ResourceTypes, DescribeConfigResponse, Consumer } from "kafkajs";
 import { SchemaRegistry } from '@ovotech/avro-kafkajs';
 import { Type } from "avsc";
 import { v4 as uuidv4 } from 'uuid';
@@ -11,7 +11,7 @@ type MessageInfo = { topic: string, partition: number, value: string, key: strin
 
 type MessagesResult = { messages: MessageInfo[], hasTimeout: boolean }
 
-type TopicQueryInput = { topic: string, partition: number, limit: number, offset: number, search: string}
+type TopicQueryInput = { topic: string, partition: number, limit: number, offset: number, search: string, timeout?: number}
 
 const schemaRegistry = new SchemaRegistry({ uri: SCHEMA_REGISTRY_URL });
 const kafka = new Kafka({
@@ -68,6 +68,7 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 		const offset = req.query.offset ? parseInt(req.query.offset.toString()) : 0
 		const topic = req.params.topic
 		const search = req.query.search ? req.query.search as string : ""
+		const timeout = req.query.timeout ? parseInt(req.query.timeout.toString()) : 20000
 		const partition = parseInt(req.params.partition)
 		const partitions = await admin.fetchTopicOffsets(topic)
 		for (const partitionOffsets of partitions) {
@@ -82,7 +83,7 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 			if (offset + limit > maxOffset) {
 				limit = maxOffset - offset
 			}
-			const messages = await getMessages({topic, partition, limit, offset, search})
+			const messages = await getMessages({topic, partition, limit, offset, search, timeout})
 			res.status(200).json(messages)
 			return
 		}
@@ -175,7 +176,7 @@ const getMessages = async (input: TopicQueryInput): Promise<MessagesResult> => {
 		setTimeout(() => {
 			hasTimeout = true
 			resolve()
-		}, 20000);
+		}, input.timeout || 20000);
 		await consumer.run({
 			autoCommit: false,
 			eachMessage: async ({ topic, partition, message }) => {
@@ -238,9 +239,27 @@ const getMessages = async (input: TopicQueryInput): Promise<MessagesResult> => {
 		return { messages, hasTimeout }
 	}
 	finally {
+		cleanupConsumer(consumer, groupId) //not awaiting this as we don't want to block the response
+	}
+}
+
+const cleanupConsumer = async (consumer: Consumer, groupId: string) => {
+	try {
 		await consumer.stop()
-		const res = await admin.deleteGroups([groupId])
-		console.log(`Delete consumer group ${res[0].groupId} result: ${res[0].errorCode || "success"}`)
+	}
+	catch (error) {
+		console.error(`error stopping consumer`, error)
+	}
+	for (var i = 3; i >= 0; i--) {
+		try {
+			const res = await admin.deleteGroups([groupId])
+			console.log(`Delete consumer group ${res[0].groupId} result: ${res[0].errorCode || "success"}`)
+			return
+		}
+		catch (error) {
+			console.error(`Error deleting consumer group ${groupId} (retries left = ${i}):`, error)
+			await new Promise( resolve => setTimeout(resolve, 300) );
+		}
 	}
 }
 
