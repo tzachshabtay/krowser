@@ -24,6 +24,26 @@ type State = {
     partitions: any[];
 }
 
+interface InputProps{
+    label: string;
+    value: number;
+    onChange?: any;
+}
+
+const InputField: React.SFC<InputProps> = (props) => {
+    return (
+        <TextField
+            label={props.label}
+            type="number"
+            value={props.value}
+            onChange={props.onChange}
+            margin="normal"
+            inputProps={{ min: "0", step: "1" }}
+            style={{ marginRight: 10, maxWidth: 50 }}
+        />
+    )
+}
+
 
 export class SingleTopicInput extends React.Component<Props, State> {
     state: State = { partitions: [], offset: 0, limit: 10, loadingMessages: false, loadingPartitions: true, partition: this.props.partition || "0" }
@@ -82,23 +102,15 @@ export class SingleTopicInput extends React.Component<Props, State> {
                             {partitions}
                         </Select>
                     </FormControl>
-                    <TextField
+                    <InputField
                         label="Offset"
-                        type="number"
                         value={this.state.offset}
                         onChange={(e: any) => this.setState({ offset: parseInt(e.target.value) })}
-                        margin="normal"
-                        inputProps={{ min: "0", step: "1" }}
-                        style={{ marginRight: 10, maxWidth: 50 }}
                     />
-                    <TextField
+                    <InputField
                         label="Limit"
-                        type="number"
                         value={this.state.limit}
                         onChange={(e: any) => this.setState({ limit: parseInt(e.target.value) })}
-                        margin="normal"
-                        style={{ marginRight: 10, maxWidth: 50 }}
-                        inputProps={{ min: "0", step: "1" }}
                     />
                     </div>
                     <GoButton

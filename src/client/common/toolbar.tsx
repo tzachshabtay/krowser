@@ -83,6 +83,8 @@ const ThemeToggle: React.SFC = () => {
     }
   };
 
+  const color = theme === `dark` ? `black` : `white`
+
   return (
     <ToggleButtonGroup
       value={theme}
@@ -91,10 +93,10 @@ const ThemeToggle: React.SFC = () => {
       aria-label="theme selector"
     >
       <ToggleButton value="light" aria-label="light theme">
-        <WbSunnyIcon htmlColor="white" />
+        <WbSunnyIcon htmlColor={color} />
       </ToggleButton>
       <ToggleButton value="dark" aria-label="dark theme">
-        <NightsStayIcon htmlColor="white" />
+        <NightsStayIcon htmlColor={color} />
       </ToggleButton>
     </ToggleButtonGroup>
   );
@@ -107,7 +109,6 @@ interface Props {
 
 export const KafkaToolbar: React.SFC<Props> = (props) => {
   const classes = useStyles();
-  const {theme, _} = useTheme();
   const [anchorElement, setAnchorElement] = React.useState(null);
 
   const menuOpen = Boolean(anchorElement);
@@ -118,11 +119,9 @@ export const KafkaToolbar: React.SFC<Props> = (props) => {
     setAnchorElement(null);
   };
 
-  const barColor = theme === `light` ? `primary` : `default`
-
   return (
     <div className={classes.root}>
-      <AppBar position="sticky" color={barColor}>
+      <AppBar position="sticky">
         <Toolbar>
           <IconButton
             edge="start"

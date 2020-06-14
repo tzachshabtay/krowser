@@ -21,13 +21,24 @@ export const GlobalThemeProvider = ({ children, theme }: any) => {
         window.localStorage.setItem(`theme`, values)
     };
 
+    let palette: any = {
+      type: "light"
+    }
+
+    if (currentTheme === `dark`) {
+      palette = {
+        type: "dark",
+        primary: {
+          main: "#90caf9"
+        },
+        secondary: {
+          main: "#f48fb1"
+        }
+      }
+    }
     const materialTheme = React.useMemo(
 		() =>
-		  createMuiTheme({
-			palette: {
-			  type: currentTheme,
-			},
-		  }),
+		  createMuiTheme({palette}),
 		[currentTheme],
 	);
 

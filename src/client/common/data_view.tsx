@@ -5,7 +5,6 @@ import Tab from '@material-ui/core/Tab';
 import Typography from '@material-ui/core/Typography';
 import Box from '@material-ui/core/Box';
 import { CardView, CardViewProps } from "./card_view";
-import { useTheme } from './theme_hook';
 
 interface DataViewProps extends GridProps, CardViewProps {
 }
@@ -47,14 +46,11 @@ export const DataView: React.SFC<DataViewProps> = (props) => {
         setTab(newValue)
     };
 
-    const { theme, _ } = useTheme()
-    const tabColor = theme === `dark` ? `secondary` : `primary`
-
     return (
         <>
         <Tabs value={tab} onChange={handleTabChange} aria-label="raw or grid mode selection"
-        indicatorColor={tabColor}
-        textColor={tabColor}>
+        indicatorColor="secondary"
+        textColor="secondary">
             <Tab label="Grid"></Tab>
             <Tab label="Raw"></Tab>
         </Tabs>
