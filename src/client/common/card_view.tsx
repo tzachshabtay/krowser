@@ -15,7 +15,7 @@ export const CardView: React.SFC<CardViewProps> = (props) => {
     const { theme, _ } = useTheme()
     const jsonTheme = theme === `dark` ? `twilight` : undefined
     return (
-        <ReactJson src={raw} theme={jsonTheme} style={{padding: 10, border: "solid gray"}} />
+        <ReactJson src={raw} theme={jsonTheme} style={{padding: 10, border: "solid gray 1px"}} />
     )
 }
 
