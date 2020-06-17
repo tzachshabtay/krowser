@@ -5,11 +5,14 @@ import { DataView} from '../common/data_view';
 import { RouteComponentProps } from "react-router-dom";
 import { CellProps, CellButton } from '../common/cell_button';
 import { GridApi, ColumnApi, GridReadyEvent } from 'ag-grid-community';
+import { ErrorMsg} from '../common/error_msg';
 
 type State = {
     search: string;
     loading: boolean;
     rows: any[];
+    error: any;
+    errorPrefix: string;
 }
 
 class ViewVersionsButton extends React.Component<CellProps, {}> {
@@ -19,7 +22,7 @@ class ViewVersionsButton extends React.Component<CellProps, {}> {
 }
 
 export class Subjects extends React.Component<RouteComponentProps, State> {
-    state: State = { search: "", loading: true, rows: [] }
+    state: State = { search: "", loading: true, rows: [], error: "", errorPrefix: "" }
     gridApi: GridApi | null = null;
     columnApi: ColumnApi | null = null;
 
@@ -31,6 +34,10 @@ export class Subjects extends React.Component<RouteComponentProps, State> {
     async componentDidMount() {
         const response = await fetch(`/api/schema-registry/subjects`)
         const data = await response.json()
+        if (data.error) {
+            this.setState({ loading: false, error: data.error, errorPrefix: "Failed to fetch subjects. Error: "})
+            return
+        }
         const results = data.map((r: any) => (
             { subject: r, history: this.props.history }))
         this.setState({ loading: false, rows: results })
@@ -42,6 +49,10 @@ export class Subjects extends React.Component<RouteComponentProps, State> {
     async fetchSubject(subject: any) {
         const response = await fetch(`/api/schema-registry/versions/${subject.subject}`)
         const data = await response.json()
+        if (data.error) {
+            this.setState({ loading: false, error: data.error, errorPrefix: `Failed to fetch subject ${subject.subject}. Error: `})
+            return
+        }
         subject.num_versions = data.length
         subject.versions = data
         if (this.gridApi) {
@@ -65,6 +76,7 @@ export class Subjects extends React.Component<RouteComponentProps, State> {
                     onSearch={e => this.setState({ search: e.target.value })}>
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
+                <ErrorMsg error={this.state.error} prefix={this.state.errorPrefix}></ErrorMsg>
                 {!this.state.loading && <DataView
                     searchQuery={this.state.search}
                     search={r => r.subject.includes(this.state.search)}

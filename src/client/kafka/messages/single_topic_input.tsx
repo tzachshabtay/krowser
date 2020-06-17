@@ -7,6 +7,7 @@ import FormControl from '@material-ui/core/FormControl';
 import Toolbar from '@material-ui/core/Toolbar';
 import MenuItem from '@material-ui/core/MenuItem';
 import { GoButton } from './go_button';
+import { ErrorMsg} from '../../common/error_msg';
 
 interface Props {
     topic: string;
@@ -23,6 +24,7 @@ type State = {
     offset: number;
     limit: number;
     partitions: any[];
+    error: any;
 }
 
 interface InputProps{
@@ -47,7 +49,7 @@ const InputField: React.SFC<InputProps> = (props) => {
 
 
 export class SingleTopicInput extends React.Component<Props, State> {
-    state: State = { partitions: [], offset: 0, limit: 5, loadingMessages: false, loadingPartitions: true, partition: this.props.partition || "0" }
+    state: State = { partitions: [], offset: 0, limit: 5, loadingMessages: false, loadingPartitions: true, partition: this.props.partition || "0", error: "" }
 
     async componentDidMount() {
         await this.fetchPartitions()
@@ -56,6 +58,10 @@ export class SingleTopicInput extends React.Component<Props, State> {
     async fetchPartitions() {
         const response = await fetch(`/api/topic/${this.props.topic}`)
         const data: any = await response.json()
+        if (data.error) {
+            this.setState({loadingPartitions: false, error: data.error})
+            return
+        }
         const results = data.offsets.map((r: any) => {
             const isEmpty = r.high.toString() === "0"
             const label = isEmpty ?
@@ -106,6 +112,7 @@ export class SingleTopicInput extends React.Component<Props, State> {
         }
         const partitions = this.state.partitions.map(p => (<MenuItem key={p.label} value={p.value}>{p.label}</MenuItem>))
         return (
+            <>
             <Toolbar>
                 <div style={{ flex: 1 }}>
                     <FormControl style={{ margin: 16, minWidth: 120 }}>
@@ -137,6 +144,8 @@ export class SingleTopicInput extends React.Component<Props, State> {
                         isRunning={this.state.loadingMessages}>
                     </GoButton>
             </Toolbar>
+            <ErrorMsg error={this.state.error} prefix="Failed to fetch partitions. Error: "></ErrorMsg>
+            </>
         )
     }
 }

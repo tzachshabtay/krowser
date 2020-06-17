@@ -5,12 +5,13 @@ import { DataView} from '../common/data_view';
 import { RouteComponentProps } from "react-router-dom";
 import { CellProps, CellButton } from '../common/cell_button';
 import { GridApi, ColumnApi, GridReadyEvent } from 'ag-grid-community';
-
-
+import { ErrorMsg} from '../common/error_msg';
 
 type State = {
     search: string;
     loading: boolean;
+    error: any;
+    errorPrefix: string;
     rows: any[];
 }
 
@@ -33,7 +34,7 @@ class ViewMessagesButton extends React.Component<CellProps, {}> {
 }
 
 export class Topics extends React.Component<RouteComponentProps, State> {
-    state: State = { search: "", loading: true, rows: [] }
+    state: State = { search: "", loading: true, rows: [], error: "", errorPrefix: "" }
     gridApi: GridApi | null = null;
     columnApi: ColumnApi | null = null;
 
@@ -45,6 +46,10 @@ export class Topics extends React.Component<RouteComponentProps, State> {
     async componentDidMount() {
         const response = await fetch(`/api/topics`)
         const data = await response.json()
+        if (data.error) {
+            this.setState({loading: false, error: data.error, errorPrefix: "Failed to fetch topics. Error: "})
+            return
+        }
         const results = data.topics.map((r: any) => (
             { topic: r.name, num_partitions: r.partitions.length, raw: r, history: this.props.history }))
         this.setState({ loading: false, rows: results })
@@ -56,6 +61,10 @@ export class Topics extends React.Component<RouteComponentProps, State> {
     async fetchTopic(topic: any) {
         const response = await fetch(`/api/topic/${topic.topic}`)
         const data = await response.json()
+        if (data.error) {
+            this.setState({loading: false, error: data.error, errorPrefix: `Failed to fetch topic ${topic.topic}. Error: `})
+            return
+        }
         let sum = 0
         for (const partition of data.offsets) {
             const high = parseInt(partition.high)
@@ -88,6 +97,7 @@ export class Topics extends React.Component<RouteComponentProps, State> {
                     onSearch={e => this.setState({ search: e.target.value })}>
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
+                <ErrorMsg error={this.state.error} prefix={this.state.errorPrefix}></ErrorMsg>
                 {!this.state.loading && <DataView
                     searchQuery={this.state.search}
                     search={r => r.topic.includes(this.state.search)}

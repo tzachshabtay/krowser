@@ -4,10 +4,12 @@ import { KafkaToolbar } from '../common/toolbar';
 import { DataView } from '../common/data_view';
 import { RouteComponentProps } from "react-router-dom";
 import Link from '@material-ui/core/Link';
+import { ErrorMsg} from '../common/error_msg';
 
 type State = {
     search: string;
     loading: boolean;
+    error: any;
     rows: any[];
     data: any;
 }
@@ -24,11 +26,15 @@ const TopicConfigLink: React.SFC<TopicConfigLinkProps> = (props) => {
 }
 
 export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: string }>, State> {
-    state: State = { search: "", loading: true, rows: [], data: {} }
+    state: State = { search: "", loading: true, rows: [], data: {}, error: "" }
 
     async componentDidMount() {
         const response = await fetch(`/api/topic/${this.props.match.params.topic}/config`)
         const data = await response.json()
+        if (data.error) {
+            this.setState({loading: false, error: data.error })
+            return
+        }
         const results = data.resources[0].configEntries
         this.setState({ data, loading: false, rows: results })
     }
@@ -52,6 +58,7 @@ export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: s
                 >
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
+                <ErrorMsg error={this.state.error} prefix="Failed to fetch configs. Error: "></ErrorMsg>
                 {!this.state.loading && <DataView
                     searchQuery={this.state.search}
                     search={r => r.configName.includes(this.state.search)}

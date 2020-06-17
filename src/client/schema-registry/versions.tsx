@@ -4,6 +4,7 @@ import { KafkaToolbar} from '../common/toolbar';
 import { DataView} from '../common/data_view';
 import { RouteComponentProps } from "react-router-dom";
 import { GridApi, ColumnApi, GridReadyEvent } from 'ag-grid-community';
+import { ErrorMsg} from '../common/error_msg';
 
 
 type State = {
@@ -11,10 +12,12 @@ type State = {
     loading: boolean;
     rows: any[];
     customCols: {cols: {}};
+    error: any;
+    errorPrefix: string;
 }
 
 export class Versions extends React.Component<RouteComponentProps<{ subject: string }>, State> {
-    state: State = { search: "", loading: true, rows: [], customCols: {cols: {}} }
+    state: State = { search: "", loading: true, rows: [], customCols: {cols: {}}, error: "", errorPrefix: "" }
     gridApi: GridApi | null = null;
     columnApi: ColumnApi | null = null;
 
@@ -26,6 +29,10 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
     async componentDidMount() {
         const response = await fetch(`/api/schema-registry/versions/${this.props.match.params.subject}`)
         const data = await response.json()
+        if (data.error) {
+            this.setState({loading: false, error: data.error, errorPrefix: "Failed to fetch versions. Error: "})
+            return
+        }
         const results = data.map((r: any) => (
             { version: r }))
         this.setState({ loading: false, rows: results })
@@ -39,6 +46,10 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
     async fetchSchema(version: any, customCols: {cols: any}) {
         const response = await fetch(`/api/schema-registry/schema/${this.props.match.params.subject}/${version.version}`)
         const data = await response.json()
+        if (data.error) {
+            this.setState({loading: false, error: data.error, errorPrefix: `Failed to fetch schema for version ${version.version}. Error: `})
+            return
+        }
         version.schema = data
         this.addToRow(version, data, customCols, "")
         if (this.gridApi) {
@@ -105,6 +116,7 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
                     onSearch={e => this.setState({ search: e.target.value })}>
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
+                <ErrorMsg error={this.state.error} prefix={this.state.errorPrefix}></ErrorMsg>
                 {!this.state.loading && <DataView
                     searchQuery={this.state.search}
                     search={r => r.schema.includes(this.state.search)}

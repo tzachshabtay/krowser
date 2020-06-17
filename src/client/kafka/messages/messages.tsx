@@ -2,6 +2,7 @@ import React from "react";
 import { RouteComponentProps } from "react-router-dom";
 import { KafkaToolbar} from '../../common/toolbar';
 import { DataView} from '../../common/data_view';
+import { ErrorMsg} from '../../common/error_msg';
 import { SingleTopicInput} from './single_topic_input';
 import { MultiTopicsInput} from './multi_topics_input';
 import Alert from '@material-ui/lab/Alert';
@@ -13,7 +14,7 @@ interface Props extends RouteComponentProps<{ topic?: string, partition?: string
 type State = {
     search: string;
     rows: any[];
-    error: string;
+    error: any;
     warning: string;
     customCols: {cols: {}};
 }
@@ -151,11 +152,7 @@ export class Messages extends React.Component<Props, State> {
     onDataFetched = (data: any) => {
         console.log(data)
         if (data.error) {
-            let errorMsg = data.error
-            if (typeof errorMsg === `object`) {
-                errorMsg = JSON.stringify(data.error)
-            }
-            this.setState({error: `Failed to fetch data. Error: ${errorMsg}`})
+            this.setState({error: data.error})
             return
         }
         const customCols = {cols: {}}
@@ -200,6 +197,7 @@ export class Messages extends React.Component<Props, State> {
                 )}
                 { this.state.warning && (<Alert severity="warning">{this.state.warning}</Alert>)}
                 { this.state.error && (<Alert severity="error">{this.state.error}</Alert>)}
+                <ErrorMsg error={this.state.error} prefix="Failed to fetch data. Error: "></ErrorMsg>
                 <DataView
                     search={r => r.rowValue.includes(this.state.search) || r.rowKey.includes(this.state.search)}
                     searchQuery={this.state.search}

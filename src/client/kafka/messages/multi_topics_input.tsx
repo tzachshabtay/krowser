@@ -9,6 +9,7 @@ import Toolbar from '@material-ui/core/Toolbar';
 import MenuItem from '@material-ui/core/MenuItem';
 import ListItemText from '@material-ui/core/ListItemText';
 import { GoButton } from './go_button';
+import { ErrorMsg} from '../../common/error_msg';
 
 interface Props {
     search: string;
@@ -23,11 +24,12 @@ type State = {
     loadingTopics: boolean;
     searchFrom: string;
     limit: number;
+    error: any;
 }
 
 
 export class MultiTopicsInput extends React.Component<Props, State> {
-    state: State = { topics: [], selectedTopics: [], searchFrom: `End`, limit: 100, loadingMessages: false, loadingTopics: true }
+    state: State = { topics: [], selectedTopics: [], searchFrom: `End`, limit: 100, loadingMessages: false, loadingTopics: true, error: "" }
 
     async componentDidMount() {
         await this.fetchTopics()
@@ -36,6 +38,10 @@ export class MultiTopicsInput extends React.Component<Props, State> {
     async fetchTopics() {
         const response = await fetch(`/api/topics`)
         const data = await response.json()
+        if (data.error) {
+            this.setState({loadingTopics: false, error: data.error })
+            return
+        }
         const topics = data.topics.map((r: any) => r.name)
         this.setState({topics, loadingTopics: false})
     }
@@ -64,6 +70,7 @@ export class MultiTopicsInput extends React.Component<Props, State> {
         const allTopicsSelected = this.state.selectedTopics.length === this.state.topics.length
 
         return (
+            <>
             <Toolbar>
                 <div style={{ flex: 1 }}>
                     <FormControl style={{ margin: 16, minWidth: 120 }}>
@@ -124,6 +131,8 @@ export class MultiTopicsInput extends React.Component<Props, State> {
                         isRunning={this.state.loadingMessages}>
                     </GoButton>
             </Toolbar>
+            <ErrorMsg error={this.state.error} prefix="Failed to fetch topics. Error: "></ErrorMsg>
+            </>
         )
     }
 }

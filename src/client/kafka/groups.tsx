@@ -4,10 +4,12 @@ import { RouteComponentProps } from "react-router-dom";
 import { CellProps, CellButton } from '../common/cell_button';
 import { KafkaToolbar} from '../common/toolbar';
 import { DataView} from '../common/data_view';
+import { ErrorMsg} from '../common/error_msg';
 
 type State = {
     search: string;
     loading: boolean;
+    error: any;
     rows: any[];
 }
 
@@ -18,11 +20,15 @@ class ViewMembersButton extends React.Component<CellProps, {}> {
 }
 
 export class Groups extends React.Component<RouteComponentProps, State> {
-    state: State = { loading: true, rows: [], search: "" }
+    state: State = { loading: true, rows: [], search: "", error: "" }
 
     async componentDidMount() {
         const response = await fetch(`/api/groups`)
         const data = await response.json()
+        if (data.error) {
+            this.setState({loading: false, error: data.error})
+            return
+        }
         const results = data.groups.map((r: any) => {
             return { numMembers: r.members.length, raw: r, history: this.props.history, ...r }
         })
@@ -47,6 +53,7 @@ export class Groups extends React.Component<RouteComponentProps, State> {
                     onSearch={e => this.setState({ search: e.target.value })}>
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
+                <ErrorMsg error={this.state.error} prefix="Failed to fetch groups. Error: "></ErrorMsg>
                 {!this.state.loading && <DataView
                     searchQuery={this.state.search}
                     search={r => r.groupId.includes(this.state.search) || r.protocol.includes(this.state.search) || r.protocolType.includes(this.state.search)}

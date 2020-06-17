@@ -30,36 +30,66 @@ console.log(__dirname)
 app.use("/assets", express.static(path.join(__dirname, "../client")));
 
 app.get("/api/topics", async (req, res) => {
-	const topics = await admin.fetchTopicMetadata(undefined as any)
-	res.status(200).json(topics)
+	try {
+		const topics = await admin.fetchTopicMetadata(undefined as any)
+		res.status(200).json(topics)
+	}
+	catch (error) {
+		res.status(500).json({ error })
+	}
 })
 
 app.get("/api/topic/:topic", async (req, res) => {
-	const offsets = await admin.fetchTopicOffsets(req.params.topic)
-	const config = await getTopicConfig(req.params.topic)
-	res.status(200).json({offsets, config})
+	try {
+		const offsets = await admin.fetchTopicOffsets(req.params.topic)
+		const config = await getTopicConfig(req.params.topic)
+		res.status(200).json({offsets, config})
+	}
+	catch (error) {
+		res.status(500).json({ error })
+	}
 })
 
 app.get("/api/topic/:topic/config", async (req, res) => {
-	const config = await getTopicConfig(req.params.topic)
-	res.status(200).json(config)
+	try {
+		const config = await getTopicConfig(req.params.topic)
+		res.status(200).json(config)
+	}
+	catch (error) {
+		res.status(500).json({ error })
+	}
 })
 
 app.get("/api/groups", async (req, res) => {
-	const consumers = await admin.listGroups()
-	const ids = consumers.groups.map(g => g.groupId)
-	const groups = await admin.describeGroups(ids)
-	res.status(200).json(groups)
+	try {
+		const consumers = await admin.listGroups()
+		const ids = consumers.groups.map(g => g.groupId)
+		const groups = await admin.describeGroups(ids)
+		res.status(200).json(groups)
+	}
+	catch (error) {
+		res.status(500).json({ error })
+	}
 })
 
 app.get("/api/members/:group", async (req, res) => {
-	const groups = await admin.describeGroups([req.params.group]) as any //https://github.com/tulios/kafkajs/issues/756
-	res.status(200).json(groups.groups[0].members)
+	try {
+		const groups = await admin.describeGroups([req.params.group]) as any //https://github.com/tulios/kafkajs/issues/756
+		res.status(200).json(groups.groups[0].members)
+	}
+	catch (error) {
+		res.status(500).json({ error })
+	}
 })
 
 app.get("/api/cluster", async (req, res) => {
-	const cluster = await admin.describeCluster()
-	res.status(200).json(cluster)
+	try {
+		const cluster = await admin.describeCluster()
+		res.status(200).json(cluster)
+	}
+	catch (error) {
+		res.status(500).json({ error })
+	}
 })
 
 app.get("/api/messages/:topic/:partition", async (req, res) => {
@@ -131,18 +161,33 @@ app.get("/api/messages-cross-topics/:topics", async (req, res) => {
 })
 
 app.get("/api/schema-registry/subjects", async (req, res) => {
-	const subjects = await schemaRegistry.getSubjects()
-	res.status(200).json(subjects)
+	try {
+		const subjects = await schemaRegistry.getSubjects()
+		res.status(200).json(subjects)
+	}
+	catch (error) {
+		res.status(500).json({ error })
+	}
 });
 
 app.get("/api/schema-registry/versions/:subject", async (req, res) => {
-	const versions = await schemaRegistry.getSubjectVersions(req.params.subject)
-	res.status(200).json(versions)
+	try {
+		const versions = await schemaRegistry.getSubjectVersions(req.params.subject)
+		res.status(200).json(versions)
+	}
+	catch (error) {
+		res.status(500).json({ error })
+	}
 })
 
 app.get("/api/schema-registry/schema/:subject/:version", async (req, res) => {
-	const schema = await schemaRegistry.getSubjectVersionSchema(req.params.subject, parseInt(req.params.version))
-	res.status(200).json(schema)
+	try {
+		const schema = await schemaRegistry.getSubjectVersionSchema(req.params.subject, parseInt(req.params.version))
+		res.status(200).json(schema)
+	}
+	catch (error) {
+		res.status(500).json({ error })
+	}
 })
 
 app.get("/*", (req, res) => {
