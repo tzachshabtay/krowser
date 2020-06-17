@@ -3,3 +3,4 @@ dist
 .vscode
 full-stack
 .history
+.DS_Store
