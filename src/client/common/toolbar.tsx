@@ -166,7 +166,7 @@ export const KafkaToolbar: React.SFC<Props> = (props) => {
             </Menu>
           <Typography className={classes.title} variant="h6" noWrap>
           <Link href="/" color="inherit">
-            Kafka Browser
+            Krowser
           </Link>
           </Typography>
           <Typography className={classes.title} variant="h6" noWrap>
@@ -190,7 +190,7 @@ export const KafkaToolbar: React.SFC<Props> = (props) => {
             </div>
           )}
           <Tooltip title="Source Code" aria-label="source code">
-            <IconButton color="inherit" target="_blank" href="https://github.com/tzachshabtay/kafka-browser/">
+            <IconButton color="inherit" target="_blank" href="https://github.com/tzachshabtay/krowser/">
                 <GitHubIcon />
             </IconButton>
           </Tooltip >

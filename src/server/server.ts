@@ -15,7 +15,7 @@ type TopicQueryInput = { topic: string, partition: number, limit: number, offset
 
 const schemaRegistry = new SchemaRegistry({ uri: SCHEMA_REGISTRY_URL });
 const kafka = new Kafka({
-	clientId: 'kafka-browser',
+	clientId: 'krowser',
 	brokers: [KAFKA_URL]
 })
 
@@ -162,7 +162,7 @@ const getTopicConfig = async (topic: string) :Promise<DescribeConfigResponse> =>
 }
 
 const getMessages = async (input: TopicQueryInput): Promise<MessagesResult> => {
-	const groupId = `kafka-browser-${Date.now()}=${uuidv4()}`
+	const groupId = `krowser-${Date.now()}=${uuidv4()}`
 	const consumer = kafka.consumer({ groupId })
 	await consumer.connect()
 
