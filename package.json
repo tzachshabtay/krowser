@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "echo \"todo\"",
     "build:backend": "cd ./src/server && tsc",
     "build:frontend": "cd ./src/client && webpack",
     "kafka-up": "cd ./test && docker-compose -f docker-compose-single-broker.yml up -d",
