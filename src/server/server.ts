@@ -5,7 +5,7 @@ import { Kafka, KafkaMessage, ResourceTypes, DescribeConfigResponse, Consumer } 
 import { SchemaRegistry } from '@ovotech/avro-kafkajs';
 import { Type } from "avsc";
 import { v4 as uuidv4 } from 'uuid';
-import { KAFKA_URL, SCHEMA_REGISTRY_URL } from "./config";
+import { KAFKA_URLS, SCHEMA_REGISTRY_URL } from "./config";
 
 type MessageInfo = { topic: string, partition: number, value: string, key: string, message: KafkaMessage, schemaType: Type | undefined }
 
@@ -16,7 +16,7 @@ type TopicQueryInput = { topic: string, partition: number, limit: number, offset
 const schemaRegistry = new SchemaRegistry({ uri: SCHEMA_REGISTRY_URL });
 const kafka = new Kafka({
 	clientId: 'krowser',
-	brokers: [KAFKA_URL]
+	brokers: KAFKA_URLS
 })
 
 const admin = kafka.admin()
