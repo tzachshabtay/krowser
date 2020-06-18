@@ -1,0 +1,12 @@
+version: '2.1'
+
+services:
+    krowser:
+      image: tzachs/krowser:latest
+      restart: unless-stopped
+      hostname: krowser
+      ports:
+        - "9999:9999"
+      environment:
+        KAFKA_URL: localhost:9092
+        SCHEMA_REGISTRY_URL: http://localhost:8081
