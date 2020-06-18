@@ -311,7 +311,15 @@ const cleanupConsumer = async (consumer: Consumer, groupId: string) => {
 export const start = async (port: number): Promise<void> => {
 	const server = http.createServer(app);
 
-	await admin.connect()
+	let connected = false
+	while (!connected) {
+		try {
+			await admin.connect()
+		} catch (error) {
+			console.error("Error connecting admin, retrying in a second", error)
+			await new Promise( resolve => setTimeout(resolve, 1000) );
+		}
+	}
 
 	return new Promise<void>((resolve, reject) => {
 		server.listen(port, resolve);
