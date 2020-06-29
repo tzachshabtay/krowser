@@ -31,7 +31,7 @@ Run it via: `docker run -it -p 9999:9999 tzachs/krowser`
 If you need to configure URLs (of kafka, schema registry), you can run, for example (if you need to run against local kafka and schema-registry):
 `docker run -it -p 9999:9999 --env KAFKA_URL=host.docker.internal:9092 --env SCHEMA_REGISTRY_URL=host.docker.internal:8081 tzachs/krowser`
 
-All available environment variable configurations can be seen in [the config file](./server/config.ts).
+All available environment variable configurations can be seen in [the config file](./src/server/config.ts).
 
 A [docker-compose example](./docs/examples/docker-compose.yml) is also available.
 
