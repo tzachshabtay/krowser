@@ -2,6 +2,7 @@
 
 Web UI to browse [kafka](https://kafka.apache.org/) and [schema registry](https://docs.confluent.io/current/schema-registry/index.html).
 
+
 ## Features
 
 - View kafka's topics, partitions, messages, consumer groups and brokers.
