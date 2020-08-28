@@ -42,7 +42,7 @@ const InputField: React.SFC<InputProps> = (props) => {
             onChange={props.onChange}
             margin="normal"
             inputProps={{ min: "0", step: "1" }}
-            style={{ marginRight: 10, maxWidth: 50 }}
+            style={{ marginRight: 10, maxWidth: 100 }}
         />
     )
 }
