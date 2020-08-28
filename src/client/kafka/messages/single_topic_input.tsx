@@ -31,7 +31,10 @@ interface InputProps{
     label: string;
     value: number;
     onChange?: any;
+    onEnter: () => {};
 }
+
+const enterKey = 13;
 
 const InputField: React.SFC<InputProps> = (props) => {
     return (
@@ -40,6 +43,7 @@ const InputField: React.SFC<InputProps> = (props) => {
             type="number"
             value={props.value}
             onChange={props.onChange}
+            onKeyDown={(e) => {if (e.keyCode === enterKey) props.onEnter()}}
             margin="normal"
             inputProps={{ min: "0", step: "1" }}
             style={{ marginRight: 10, maxWidth: 100 }}
@@ -132,11 +136,13 @@ export class SingleTopicInput extends React.Component<Props, State> {
                         label="Offset"
                         value={this.state.offset}
                         onChange={(e: any) => this.setState({ offset: parseInt(e.target.value) })}
+                        onEnter={async () => { await this.fetchMessagesLong() }}
                     />
                     <InputField
                         label="Limit"
                         value={this.state.limit}
                         onChange={(e: any) => this.setState({ limit: parseInt(e.target.value) })}
+                        onEnter={async () => { await this.fetchMessagesLong() }}
                     />
                     </div>
                     <GoButton
