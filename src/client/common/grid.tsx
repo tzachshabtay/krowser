@@ -32,6 +32,7 @@ export const Grid: React.SFC<GridProps> = (props) => {
                 defaultColDef={{ sortable: true, filter: true, resizable: true }}
                 onGridReady={props.onGridReady}
                 onFilterChanged={props.onFilterChanged}
+                enableCellTextSelection={true}
             >
             </AgGridReact>
         </div>
