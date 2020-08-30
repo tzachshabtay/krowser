@@ -105,6 +105,7 @@ const ThemeToggle: React.SFC = () => {
 interface Props {
     title: string;
     onSearch?: React.ChangeEventHandler<HTMLTextAreaElement | HTMLInputElement>;
+    searchText?: string;
 }
 
 export const KafkaToolbar: React.SFC<Props> = (props) => {
@@ -185,6 +186,7 @@ export const KafkaToolbar: React.SFC<Props> = (props) => {
                     input: classes.inputInput,
                 }}
                 inputProps={{ 'aria-label': 'search' }}
+                value={props.searchText}
                 onChange={props.onSearch}
                 />
             </div>

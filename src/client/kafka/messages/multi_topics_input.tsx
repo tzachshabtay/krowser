@@ -13,6 +13,9 @@ import { ErrorMsg} from '../../common/error_msg';
 
 interface Props {
     search: string;
+    selectedTopics?: any;
+    searchFrom?: any;
+    limit?: any;
     onDataFetched: (data: any) => void;
     onDataFetchStarted: () => void;
 }
@@ -32,6 +35,17 @@ export class MultiTopicsInput extends React.Component<Props, State> {
     state: State = { topics: [], selectedTopics: [], searchFrom: `End`, limit: 100, loadingMessages: false, loadingTopics: true, error: "" }
 
     async componentDidMount() {
+        const newState: any = {};
+        if (this.props.selectedTopics !== undefined) {
+            newState.selectedTopics = this.props.selectedTopics.split(`,`)
+        }
+        if (this.props.searchFrom !== undefined) {
+            newState.searchFrom = this.props.searchFrom
+        }
+        if (this.props.limit !== undefined) {
+            newState.limit = this.props.limit
+        }
+        this.setState(newState, this.updateUrl)
         await this.fetchTopics()
     }
 
@@ -56,7 +70,20 @@ export class MultiTopicsInput extends React.Component<Props, State> {
         this.setState({loadingMessages: false})
     }
 
+    updateUrl = () => {
+        let url = `/messages-cross-topics?searchFrom=${this.state.searchFrom}&limit=${this.state.limit}`
+        if (this.state.selectedTopics.length > 0) {
+            url = `${url}&topics=${this.state.selectedTopics.join(`,`)}`
+        }
+        if (this.props.search) {
+            url = `${url}&search=${this.props.search}`
+        }
+        //We're using window.history and not the router history because we don't want to navigate away, this is just for sharing url purposes.
+        window.history.replaceState(null, document.title, url)
+    }
+
     render() {
+        this.updateUrl()
         if (this.state.loadingTopics) {
             return (<><CircularProgress /><div>Loading...</div></>)
         }
@@ -88,7 +115,7 @@ export class MultiTopicsInput extends React.Component<Props, State> {
                                         selected = this.state.topics
                                     }
                                 }
-                                this.setState({ selectedTopics: selected })
+                                this.setState({ selectedTopics: selected }, this.updateUrl)
                             }}
                             inputProps={{
                                 name: 'topics',
@@ -107,7 +134,7 @@ export class MultiTopicsInput extends React.Component<Props, State> {
                         <InputLabel htmlFor="search-from-select">Search From</InputLabel>
                         <Select
                                 value={this.state.searchFrom}
-                                onChange={(e: any) => this.setState({ searchFrom: e.target.value })}
+                                onChange={(e: any) => this.setState({ searchFrom: e.target.value }, this.updateUrl)}
                                 inputProps={{
                                     name: 'search-from',
                                     id: 'search-from-select',
@@ -120,7 +147,7 @@ export class MultiTopicsInput extends React.Component<Props, State> {
                         label="Limit"
                         type="number"
                         value={this.state.limit}
-                        onChange={(e: any) => this.setState({ limit: parseInt(e.target.value) })}
+                        onChange={(e: any) => this.setState({ limit: parseInt(e.target.value) }, this.updateUrl)}
                         margin="normal"
                         style={{ marginRight: 10, maxWidth: 50 }}
                         inputProps={{ min: "0", step: "1" }}
