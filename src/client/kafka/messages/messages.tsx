@@ -7,6 +7,7 @@ import { SingleTopicInput} from './single_topic_input';
 import { MultiTopicsInput} from './multi_topics_input';
 import Alert from '@material-ui/lab/Alert';
 import { GridReadyEvent, GridApi, ColumnApi, FilterChangedEvent } from 'ag-grid-community';
+import qs = require('qs');
 
 interface Props extends RouteComponentProps<{ topic?: string, partition?: string }> {
 }
@@ -23,6 +24,13 @@ export class Messages extends React.Component<Props, State> {
     state: State = { search: "", rows: [], customCols: {cols: {}}, error: "", warning: "" }
     api: GridApi | null = null;
     columnApi: ColumnApi | null = null;
+
+    componentDidMount() {
+        const query = this.getSearchQuery()
+        if (query.search) {
+            this.setState({search: query.search.toString()})
+        }
+    }
 
     getRow = (data: any, customCols: {cols: {}}): any => {
         let row: any = {
@@ -170,12 +178,22 @@ export class Messages extends React.Component<Props, State> {
         })
     }
 
+    getSearchQuery(): qs.ParsedQs {
+        let searchQuery = this.props.location.search
+        if (searchQuery.startsWith("?")) {
+            searchQuery = searchQuery.substring(1)
+        }
+        return qs.parse(searchQuery)
+    }
+
     render() {
         const title = this.props.match.params.topic === undefined ? `Cross-Topic search` : `Messages for topic: ${this.props.match.params.topic}`
+        const query = this.getSearchQuery()
         return (
             <>
                 <KafkaToolbar
                     title={title}
+                    searchText={this.state.search}
                     onSearch={e => this.setState({ search: e.target.value })}>
                 </KafkaToolbar>
                 <br />
@@ -184,6 +202,9 @@ export class Messages extends React.Component<Props, State> {
                     <MultiTopicsInput
                         onDataFetched={this.onDataFetched}
                         onDataFetchStarted={this.onDataFetchStarted}
+                        limit={query.limit}
+                        searchFrom={query.searchFrom}
+                        selectedTopics={query.topics}
                         search={this.state.search}>
                     </MultiTopicsInput>
                 ) : (
@@ -191,6 +212,8 @@ export class Messages extends React.Component<Props, State> {
                         topic={this.props.match.params.topic}
                         partition={this.props.match.params.partition}
                         search={this.state.search}
+                        offset={query.offset}
+                        limit={query.limit}
                         onDataFetched={this.onDataFetched}
                         onDataFetchStarted={this.onDataFetchStarted}>
                     </SingleTopicInput>
