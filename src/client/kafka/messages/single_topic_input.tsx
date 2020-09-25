@@ -12,6 +12,8 @@ import { ErrorMsg} from '../../common/error_msg';
 interface Props {
     topic: string;
     partition?: string;
+    offset?: any;
+    limit?: any;
     search: string;
     onDataFetched: (data: any) => void;
     onDataFetchStarted: () => void;
@@ -31,7 +33,10 @@ interface InputProps{
     label: string;
     value: number;
     onChange?: any;
+    onEnter: () => {};
 }
+
+const enterKey = 13;
 
 const InputField: React.SFC<InputProps> = (props) => {
     return (
@@ -40,6 +45,7 @@ const InputField: React.SFC<InputProps> = (props) => {
             type="number"
             value={props.value}
             onChange={props.onChange}
+            onKeyDown={(e) => {if (e.keyCode === enterKey) props.onEnter()}}
             margin="normal"
             inputProps={{ min: "0", step: "1" }}
             style={{ marginRight: 10, maxWidth: 100 }}
@@ -70,25 +76,42 @@ export class SingleTopicInput extends React.Component<Props, State> {
             return { label: label, value: r.partition.toString(), isEmpty }
         })
         const newState: any = { loadingPartitions: false, partitions: results }
+        if (this.props.limit !== undefined) {
+            newState.limit = parseInt(this.props.limit)
+        }
         if (this.props.partition === undefined) {
             const nonEmpty = results.find((row: any) => !row.isEmpty)
             if (nonEmpty) {
                 newState.partition = nonEmpty.value
             }
         }
-        this.setState(newState)
         const partitionIndex = newState.partition || this.props.partition
-        if (partitionIndex !== undefined) {
-            const partition = data.offsets[parseInt(partitionIndex)]
-            let offset = partition.high - this.state.limit
-            if (offset < partition.low) {
-                offset = partition.low
-            }
-            this.setState({offset}, this.fetchMessagesShort)
+        const offset = this.getInitialOffset(partitionIndex, data)
+        if (offset === undefined) {
+            this.setState(newState, this.updateUrl)
+        } else {
+            newState.offset = offset
+            this.setState(newState, this.fetchMessagesShort)
         }
     }
 
+    getInitialOffset = (partitionIndex: string | undefined, data: any): number | undefined => {
+        if (this.props.offset !== undefined) {
+            return parseInt(this.props.offset)
+        }
+        if (partitionIndex === undefined) {
+            return undefined
+        }
+        const partition = data.offsets[parseInt(partitionIndex)]
+        let offset = partition.high - this.state.limit
+        if (offset < partition.low) {
+            offset = partition.low
+        }
+        return offset
+    }
+
     fetchMessagesShort = async () => {
+        this.updateUrl()
         await this.fetchMessages(10000)
     }
 
@@ -106,7 +129,17 @@ export class SingleTopicInput extends React.Component<Props, State> {
         this.setState({loadingMessages: false})
     }
 
+    updateUrl = () => {
+        let url = `/topic/messages/${this.props.topic}/${this.state.partition}?offset=${this.state.offset}&limit=${this.state.limit}`
+        if (this.props.search) {
+            url = `${url}&search=${this.props.search}`
+        }
+        //We're using window.history and not the router history because we don't want to navigate away, this is just for sharing url purposes.
+        window.history.replaceState(null, document.title, url)
+    }
+
     render() {
+        this.updateUrl()
         if (this.state.loadingPartitions) {
             return (<><CircularProgress /><div>Loading...</div></>)
         }
@@ -119,7 +152,7 @@ export class SingleTopicInput extends React.Component<Props, State> {
                         <InputLabel htmlFor="partition-select">Partition</InputLabel>
                         <Select
                             value={this.state.partition}
-                            onChange={(e: any) => this.setState({ partition: e.target.value })}
+                            onChange={(e: any) => this.setState({ partition: e.target.value }, this.updateUrl)}
                             inputProps={{
                                 name: 'partition',
                                 id: 'partition-select',
@@ -131,12 +164,14 @@ export class SingleTopicInput extends React.Component<Props, State> {
                     <InputField
                         label="Offset"
                         value={this.state.offset}
-                        onChange={(e: any) => this.setState({ offset: parseInt(e.target.value) })}
+                        onChange={(e: any) => this.setState({ offset: parseInt(e.target.value) }, this.updateUrl)}
+                        onEnter={async () => { await this.fetchMessagesLong() }}
                     />
                     <InputField
                         label="Limit"
                         value={this.state.limit}
-                        onChange={(e: any) => this.setState({ limit: parseInt(e.target.value) })}
+                        onChange={(e: any) => this.setState({ limit: parseInt(e.target.value) }, this.updateUrl)}
+                        onEnter={async () => { await this.fetchMessagesLong() }}
                     />
                     </div>
                     <GoButton

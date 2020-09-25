@@ -107,7 +107,7 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 			}
 			const maxOffset = parseInt(partitionOffsets.high)
 			if (maxOffset === 0 || offset > maxOffset) {
-				res.status(200).json([])
+				res.status(200).json({messages: []})
 				return
 			}
 			if (offset + limit > maxOffset) {
