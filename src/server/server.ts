@@ -42,8 +42,14 @@ app.get("/api/topics", async (req, res) => {
 app.get("/api/topic/:topic", async (req, res) => {
 	try {
 		const offsets = await admin.fetchTopicOffsets(req.params.topic)
-		const config = await getTopicConfig(req.params.topic)
-		res.status(200).json({offsets, config})
+		try {
+			const config = await getTopicConfig(req.params.topic)
+			res.status(200).json({offsets, config})
+		}
+		catch (error) {
+			console.error(`Error while fetching config for topic ${req.params.topic}:`, error)
+			res.status(200).json({offsets})
+		}
 	}
 	catch (error) {
 		res.status(500).json({ error })

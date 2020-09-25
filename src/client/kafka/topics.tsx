@@ -73,7 +73,11 @@ export class Topics extends React.Component<RouteComponentProps, State> {
         topic.offsets = data.offsets
         topic.config = data.config
         topic.num_messages = sum
-        topic.num_configs = data.config.resources[0].configEntries.length
+        if (data.config) {
+            topic.num_configs = data.config.resources[0].configEntries.length
+        } else {
+            topic.num_configs = `Unknown`
+        }
         if (this.gridApi) {
             this.gridApi.refreshCells()
         }
