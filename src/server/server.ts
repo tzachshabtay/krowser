@@ -1,7 +1,7 @@
 import express from "express";
 import http from "http";
 import path from "path";
-import { Kafka, KafkaMessage, ResourceTypes, DescribeConfigResponse, Consumer } from "kafkajs";
+import { Kafka, KafkaMessage, ResourceTypes, DescribeConfigResponse, Consumer, Admin } from "kafkajs";
 import { SchemaRegistry } from '@ovotech/avro-kafkajs';
 import { Type } from "avsc";
 import { v4 as uuidv4 } from 'uuid';
@@ -14,12 +14,34 @@ type MessagesResult = { messages: MessageInfo[], hasTimeout: boolean }
 type TopicQueryInput = { topic: string, partition: number, limit: number, offset: number, search: string, timeout?: number}
 
 const schemaRegistry = new SchemaRegistry({ uri: SCHEMA_REGISTRY_URL });
-const kafka = new Kafka({
-	clientId: 'krowser',
-	brokers: KAFKA_URLS
-})
 
-const admin = kafka.admin()
+class KafkaClient {
+	public Kafka!: Kafka;
+	public Admin!: Admin;
+
+	public async Connect() {
+		this.Kafka = new Kafka({
+			clientId: 'krowser',
+			brokers: KAFKA_URLS
+		})
+		this.Admin = this.Kafka.admin()
+
+		console.log(`connecting to admin`)
+		let connected = false
+		while (!connected) {
+			try {
+				await kafka.Admin.connect()
+				connected = true
+			} catch (error) {
+				console.error("Error connecting admin, retrying in a second", error)
+				await new Promise( resolve => setTimeout(resolve, 1000) );
+			}
+		}
+		console.log(`connected to admin`)
+	}
+}
+
+const kafka = new KafkaClient();
 
 const app = express();
 
@@ -29,9 +51,20 @@ app.set("views", "public");
 console.log(__dirname)
 app.use("/assets", express.static(path.join(__dirname, "../client")));
 
+async function withRetry<TRes>(name: string, fun: () => Promise<TRes>): Promise<TRes> {
+	try {
+		return await fun();
+	}
+	catch (error) {
+		console.error(`Error when trying ${name}, reconnecting kafka. Error: `, error)
+		await kafka.Connect();
+		return await fun();
+	}
+}
+
 app.get("/api/topics", async (req, res) => {
 	try {
-		const topics = await admin.fetchTopicMetadata(undefined as any)
+		const topics = await withRetry("fetchTopicMetadata", () => kafka.Admin.fetchTopicMetadata(undefined as any))
 		res.status(200).json(topics)
 	}
 	catch (error) {
@@ -41,7 +74,7 @@ app.get("/api/topics", async (req, res) => {
 
 app.get("/api/topic/:topic", async (req, res) => {
 	try {
-		const offsets = await admin.fetchTopicOffsets(req.params.topic)
+		const offsets = await withRetry("fetchTopicOffsets", () => kafka.Admin.fetchTopicOffsets(req.params.topic))
 		try {
 			const config = await getTopicConfig(req.params.topic)
 			res.status(200).json({offsets, config})
@@ -68,9 +101,9 @@ app.get("/api/topic/:topic/config", async (req, res) => {
 
 app.get("/api/groups", async (req, res) => {
 	try {
-		const consumers = await admin.listGroups()
+		const consumers = await withRetry("listGroups", () => kafka.Admin.listGroups())
 		const ids = consumers.groups.map(g => g.groupId)
-		const groups = await admin.describeGroups(ids)
+		const groups = await withRetry("describeGroups", () => kafka.Admin.describeGroups(ids))
 		res.status(200).json(groups)
 	}
 	catch (error) {
@@ -80,7 +113,7 @@ app.get("/api/groups", async (req, res) => {
 
 app.get("/api/members/:group", async (req, res) => {
 	try {
-		const groups = await admin.describeGroups([req.params.group]) as any //https://github.com/tulios/kafkajs/issues/756
+		const groups = await withRetry("describeGroups", () => kafka.Admin.describeGroups([req.params.group])) as any //https://github.com/tulios/kafkajs/issues/756
 		res.status(200).json(groups.groups[0].members)
 	}
 	catch (error) {
@@ -90,7 +123,7 @@ app.get("/api/members/:group", async (req, res) => {
 
 app.get("/api/cluster", async (req, res) => {
 	try {
-		const cluster = await admin.describeCluster()
+		const cluster = await withRetry("describeCluster", () => kafka.Admin.describeCluster())
 		res.status(200).json(cluster)
 	}
 	catch (error) {
@@ -106,7 +139,7 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 		const search = req.query.search ? req.query.search as string : ""
 		const timeout = req.query.timeout ? parseInt(req.query.timeout.toString()) : 20000
 		const partition = parseInt(req.params.partition)
-		const partitions = await admin.fetchTopicOffsets(topic)
+		const partitions = await withRetry("fetchTopicOffsets", () => kafka.Admin.fetchTopicOffsets(topic))
 		for (const partitionOffsets of partitions) {
 			if (partitionOffsets.partition !== partition) {
 				continue
@@ -141,7 +174,7 @@ app.get("/api/messages-cross-topics/:topics", async (req, res) => {
 		const topics = req.params.topics.split(`,`)
 		let hasTimeout = false
 		for (const topic of topics) {
-			const partitions = await admin.fetchTopicOffsets(topic)
+			const partitions = await withRetry("fetchTopicOffsets", () => kafka.Admin.fetchTopicOffsets(topic))
 			for (const partition of partitions) {
 				const low = parseInt(partition.low)
 				const high = parseInt(partition.high)
@@ -200,8 +233,8 @@ app.get("/*", (req, res) => {
 	res.render("index");
 });
 
-const getTopicConfig = async (topic: string) :Promise<DescribeConfigResponse> => {
-	return await admin.describeConfigs({
+const getTopicConfig = async (topic: string): Promise<DescribeConfigResponse> => {
+	return await withRetry("describeConfigs", () => kafka.Admin.describeConfigs({
 		includeSynonyms: false,
 		resources: [
 			{
@@ -209,12 +242,12 @@ const getTopicConfig = async (topic: string) :Promise<DescribeConfigResponse> =>
 			name: topic
 			}
 		]
-	})
+	}))
 }
 
 const getMessages = async (input: TopicQueryInput): Promise<MessagesResult> => {
 	const groupId = `krowser-${Date.now()}=${uuidv4()}`
-	const consumer = kafka.consumer({ groupId })
+	const consumer = kafka.Kafka.consumer({ groupId })
 	await consumer.connect()
 
 	const messages: MessageInfo[] = []
@@ -303,7 +336,7 @@ const cleanupConsumer = async (consumer: Consumer, groupId: string) => {
 	}
 	for (var i = 3; i >= 0; i--) {
 		try {
-			const res = await admin.deleteGroups([groupId])
+			const res = await withRetry("deleteGroups", () => kafka.Admin.deleteGroups([groupId]))
 			console.log(`Delete consumer group ${res[0].groupId} result: ${res[0].errorCode || "success"}`)
 			return
 		}
@@ -317,18 +350,7 @@ const cleanupConsumer = async (consumer: Consumer, groupId: string) => {
 export const start = async (port: number): Promise<void> => {
 	const server = http.createServer(app);
 
-	console.log(`connecting to admin`)
-	let connected = false
-	while (!connected) {
-		try {
-			await admin.connect()
-			connected = true
-		} catch (error) {
-			console.error("Error connecting admin, retrying in a second", error)
-			await new Promise( resolve => setTimeout(resolve, 1000) );
-		}
-	}
-	console.log(`connected to admin`)
+	await kafka.Connect();
 
 	return new Promise<void>((resolve, reject) => {
 		server.listen(port, resolve);
