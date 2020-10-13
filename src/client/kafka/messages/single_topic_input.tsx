@@ -8,6 +8,7 @@ import Toolbar from '@material-ui/core/Toolbar';
 import MenuItem from '@material-ui/core/MenuItem';
 import { GoButton } from './go_button';
 import { ErrorMsg} from '../../common/error_msg';
+import { Url } from '../../common/url';
 
 interface Props {
     topic: string;
@@ -15,6 +16,7 @@ interface Props {
     offset?: any;
     limit?: any;
     search: string;
+    url: Url;
     onDataFetched: (data: any) => void;
     onDataFetchStarted: () => void;
 }
@@ -130,16 +132,11 @@ export class SingleTopicInput extends React.Component<Props, State> {
     }
 
     updateUrl = () => {
-        let url = `/topic/messages/${this.props.topic}/${this.state.partition}?offset=${this.state.offset}&limit=${this.state.limit}`
-        if (this.props.search) {
-            url = `${url}&search=${this.props.search}`
-        }
-        //We're using window.history and not the router history because we don't want to navigate away, this is just for sharing url purposes.
-        window.history.replaceState(null, document.title, url)
+        this.props.url.BaseUrl = `/topic/messages/${this.props.topic}/${this.state.partition}`
+        this.props.url.Set({name: `offset`, val: this.state.offset.toString()}, {name: `limit`, val: this.state.limit.toString()})
     }
 
     render() {
-        this.updateUrl()
         if (this.state.loadingPartitions) {
             return (<><CircularProgress /><div>Loading...</div></>)
         }

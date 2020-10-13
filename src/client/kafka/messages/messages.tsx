@@ -7,7 +7,7 @@ import { SingleTopicInput} from './single_topic_input';
 import { MultiTopicsInput} from './multi_topics_input';
 import Alert from '@material-ui/lab/Alert';
 import { GridReadyEvent, GridApi, ColumnApi, FilterChangedEvent } from 'ag-grid-community';
-import qs = require('qs');
+import { Url } from "../../common/url";
 
 interface Props extends RouteComponentProps<{ topic?: string, partition?: string }> {
 }
@@ -24,11 +24,17 @@ export class Messages extends React.Component<Props, State> {
     state: State = { search: "", rows: [], customCols: {cols: {}}, error: "", warning: "" }
     api: GridApi | null = null;
     columnApi: ColumnApi | null = null;
+    url: Url;
+
+    constructor(props: Props) {
+        super(props);
+        this.url = new Url(props.location.search, ``);
+    }
 
     componentDidMount() {
-        const query = this.getSearchQuery()
-        if (query.search) {
-            this.setState({search: query.search.toString()})
+        const search = this.url.Get(`search`) || ``
+        if (search) {
+            this.setState({search})
         }
     }
 
@@ -178,21 +184,13 @@ export class Messages extends React.Component<Props, State> {
         })
     }
 
-    getSearchQuery(): qs.ParsedQs {
-        let searchQuery = this.props.location.search
-        if (searchQuery.startsWith("?")) {
-            searchQuery = searchQuery.substring(1)
-        }
-        return qs.parse(searchQuery)
-    }
-
     render() {
         const title = this.props.match.params.topic === undefined ? `Cross-Topic search` : `Messages for topic: ${this.props.match.params.topic}`
-        const query = this.getSearchQuery()
         return (
             <>
                 <KafkaToolbar
                     title={title}
+                    url={this.url}
                     searchText={this.state.search}
                     onSearch={e => this.setState({ search: e.target.value })}>
                 </KafkaToolbar>
@@ -202,18 +200,20 @@ export class Messages extends React.Component<Props, State> {
                     <MultiTopicsInput
                         onDataFetched={this.onDataFetched}
                         onDataFetchStarted={this.onDataFetchStarted}
-                        limit={query.limit}
-                        searchFrom={query.searchFrom}
-                        selectedTopics={query.topics}
+                        url={this.url}
+                        limit={this.url.Get(`limit`)}
+                        searchFrom={this.url.Get(`searchFrom`)}
+                        selectedTopics={this.url.Get(`topics`)}
                         search={this.state.search}>
                     </MultiTopicsInput>
                 ) : (
                     <SingleTopicInput
                         topic={this.props.match.params.topic}
                         partition={this.props.match.params.partition}
+                        url={this.url}
                         search={this.state.search}
-                        offset={query.offset}
-                        limit={query.limit}
+                        offset={this.url.Get(`offset`)}
+                        limit={this.url.Get(`limit`)}
                         onDataFetched={this.onDataFetched}
                         onDataFetchStarted={this.onDataFetchStarted}>
                     </SingleTopicInput>
@@ -226,6 +226,7 @@ export class Messages extends React.Component<Props, State> {
                     searchQuery={this.state.search}
                     rows={this.state.rows}
                     raw={this.state.rows.map(r => r.rowJson)}
+                    url={this.url}
                     columnDefs={this.getColumnDefs()}
                     onGridReady={this.onGridReady}
                     onFilterChanged={this.onFilterChanged}

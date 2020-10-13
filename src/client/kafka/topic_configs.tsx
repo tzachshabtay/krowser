@@ -5,6 +5,7 @@ import { DataView } from '../common/data_view';
 import { RouteComponentProps } from "react-router-dom";
 import Link from '@material-ui/core/Link';
 import { ErrorMsg} from '../common/error_msg';
+import { Url } from "../common/url";
 
 type State = {
     search: string;
@@ -27,6 +28,12 @@ const TopicConfigLink: React.SFC<TopicConfigLinkProps> = (props) => {
 
 export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: string }>, State> {
     state: State = { search: "", loading: true, rows: [], data: {}, error: "" }
+    url: Url;
+
+    constructor(props: RouteComponentProps<{ topic: string }>) {
+        super(props);
+        this.url = new Url(props.location.search, ``);
+    }
 
     async componentDidMount() {
         const response = await fetch(`/api/topic/${this.props.match.params.topic}/config`)
@@ -36,7 +43,8 @@ export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: s
             return
         }
         const results = data.resources[0].configEntries
-        this.setState({ data, loading: false, rows: results })
+        const search = this.url.Get(`search`) || ``
+        this.setState({ data, loading: false, rows: results, search })
     }
 
     getColumnDefs() {
@@ -54,6 +62,8 @@ export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: s
             <>
                 <KafkaToolbar
                     title={`Configs for topic: ${this.props.match.params.topic}`}
+                    url={this.url}
+                    searchText={this.state.search}
                     onSearch={e => this.setState({ search: e.target.value })}
                 >
                 </KafkaToolbar>
@@ -64,6 +74,7 @@ export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: s
                     search={r => r.configName.includes(this.state.search)}
                     rows={this.state.rows}
                     raw={this.state.data}
+                    url={this.url}
                     columnDefs={this.getColumnDefs()}>
                 </DataView>}
             </>

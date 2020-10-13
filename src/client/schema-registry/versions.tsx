@@ -5,6 +5,7 @@ import { DataView} from '../common/data_view';
 import { RouteComponentProps } from "react-router-dom";
 import { GridApi, ColumnApi, GridReadyEvent } from 'ag-grid-community';
 import { ErrorMsg} from '../common/error_msg';
+import { Url } from "../common/url";
 
 
 type State = {
@@ -20,6 +21,12 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
     state: State = { search: "", loading: true, rows: [], customCols: {cols: {}}, error: "", errorPrefix: "" }
     gridApi: GridApi | null = null;
     columnApi: ColumnApi | null = null;
+    url: Url;
+
+    constructor(props: RouteComponentProps<{ subject: string }>) {
+        super(props);
+        this.url = new Url(props.location.search, ``);
+    }
 
     onGridReady = (params: GridReadyEvent) => {
         this.gridApi = params.api;
@@ -35,7 +42,8 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
         }
         const results = data.map((r: any) => (
             { version: r }))
-        this.setState({ loading: false, rows: results })
+        const search = this.url.Get(`search`) || ``
+        this.setState({ loading: false, rows: results, search })
         const customCols = {cols: {}}
         for (const version of results) {
             await this.fetchSchema(version, customCols)
@@ -113,6 +121,8 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
             <>
                 <KafkaToolbar
                     title={`Schemas for subject ${this.props.match.params.subject}`}
+                    url={this.url}
+                    searchText={this.state.search}
                     onSearch={e => this.setState({ search: e.target.value })}>
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
@@ -122,6 +132,7 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
                     search={r => r.schema.includes(this.state.search)}
                     rows={this.state.rows}
                     raw={this.state.rows.map(r => ({version: r.version, schema: r.schema}))}
+                    url={this.url}
                     columnDefs={this.getColumnDefs()}
                     onGridReady={this.onGridReady}
                     >

@@ -18,6 +18,7 @@ import ToggleButton from '@material-ui/lab/ToggleButton';
 import ToggleButtonGroup from '@material-ui/lab/ToggleButtonGroup';
 import WbSunnyIcon from '@material-ui/icons/WbSunny';
 import NightsStayIcon from '@material-ui/icons/NightsStay';
+import { Url } from './url';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -106,6 +107,7 @@ interface Props {
     title: string;
     onSearch?: React.ChangeEventHandler<HTMLTextAreaElement | HTMLInputElement>;
     searchText?: string;
+    url: Url;
 }
 
 export const KafkaToolbar: React.SFC<Props> = (props) => {
@@ -187,7 +189,12 @@ export const KafkaToolbar: React.SFC<Props> = (props) => {
                 }}
                 inputProps={{ 'aria-label': 'search' }}
                 value={props.searchText}
-                onChange={props.onSearch}
+                onChange={e => {
+                  props.url.Set({name: `search`, val: e.target.value})
+                  if (props.onSearch) {
+                    props.onSearch(e)
+                  }
+                }}
                 />
             </div>
           )}

@@ -5,6 +5,7 @@ import { CellProps, CellButton } from '../common/cell_button';
 import { KafkaToolbar} from '../common/toolbar';
 import { DataView} from '../common/data_view';
 import { ErrorMsg} from '../common/error_msg';
+import { Url } from "../common/url";
 
 type State = {
     loading: boolean;
@@ -20,6 +21,12 @@ class ViewMessagesButton extends React.Component<CellProps, {}> {
 
 export class Partitions extends React.Component<RouteComponentProps<{ topic: string }>, State> {
     state: State = { loading: true, rows: [], error: "" }
+    url: Url;
+
+    constructor(props: RouteComponentProps<{ topic: string }>) {
+        super(props);
+        this.url = new Url(props.location.search, ``);
+    }
 
     async componentDidMount() {
         const response = await fetch(`/api/topic/${this.props.match.params.topic}`)
@@ -46,7 +53,10 @@ export class Partitions extends React.Component<RouteComponentProps<{ topic: str
     render() {
         return (
             <>
-                <KafkaToolbar title={`Partitions for topic: ${this.props.match.params.topic}`}>
+                <KafkaToolbar
+                    title={`Partitions for topic: ${this.props.match.params.topic}`}
+                    url={this.url}
+                >
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
                 <ErrorMsg error={this.state.error} prefix="Failed to fetch partitions. Error: "></ErrorMsg>
@@ -55,6 +65,7 @@ export class Partitions extends React.Component<RouteComponentProps<{ topic: str
                     search={_ => true}
                     rows={this.state.rows}
                     raw={this.state.rows.map(r => ({topic: r.topic, ...r.raw}))}
+                    url={this.url}
                     columnDefs={this.getColumnDefs()}>
                 </DataView>}
             </>
