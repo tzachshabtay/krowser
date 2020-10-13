@@ -10,8 +10,10 @@ import MenuItem from '@material-ui/core/MenuItem';
 import ListItemText from '@material-ui/core/ListItemText';
 import { GoButton } from './go_button';
 import { ErrorMsg} from '../../common/error_msg';
+import { Url } from '../../common/url';
 
 interface Props {
+    url: Url;
     search: string;
     selectedTopics?: any;
     searchFrom?: any;
@@ -71,19 +73,14 @@ export class MultiTopicsInput extends React.Component<Props, State> {
     }
 
     updateUrl = () => {
-        let url = `/messages-cross-topics?searchFrom=${this.state.searchFrom}&limit=${this.state.limit}`
-        if (this.state.selectedTopics.length > 0) {
-            url = `${url}&topics=${this.state.selectedTopics.join(`,`)}`
-        }
-        if (this.props.search) {
-            url = `${url}&search=${this.props.search}`
-        }
-        //We're using window.history and not the router history because we don't want to navigate away, this is just for sharing url purposes.
-        window.history.replaceState(null, document.title, url)
+        this.props.url.BaseUrl = `/messages-cross-topics`
+        this.props.url.Set(
+            {name: `searchFrom`, val: this.state.searchFrom},
+            {name: `limit`, val: this.state.limit.toString()},
+            {name: `topics`, val: this.state.selectedTopics.join(`,`)})
     }
 
     render() {
-        this.updateUrl()
         if (this.state.loadingTopics) {
             return (<><CircularProgress /><div>Loading...</div></>)
         }

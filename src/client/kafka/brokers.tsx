@@ -4,6 +4,7 @@ import { RouteComponentProps } from "react-router-dom";
 import { KafkaToolbar} from '../common/toolbar';
 import { DataView} from '../common/data_view';
 import { ErrorMsg} from '../common/error_msg';
+import { Url } from "../common/url";
 
 type State = {
     search: string;
@@ -15,6 +16,12 @@ type State = {
 
 export class Brokers extends React.Component<RouteComponentProps, State> {
     state: State = { loading: true, rows: [], data: {}, search: "", error: "" }
+    url: Url;
+
+    constructor(props: RouteComponentProps) {
+        super(props);
+        this.url = new Url(props.location.search, ``);
+    }
 
     async componentDidMount() {
         const response = await fetch(`/api/cluster`)
@@ -24,7 +31,8 @@ export class Brokers extends React.Component<RouteComponentProps, State> {
             return
         }
         const rows = data.brokers
-        this.setState({ loading: false, rows, data })
+        const search = this.url.Get(`search`) || ``
+        this.setState({ loading: false, rows, data, search })
     }
 
     getColumnDefs() {
@@ -40,6 +48,8 @@ export class Brokers extends React.Component<RouteComponentProps, State> {
             <>
                 <KafkaToolbar
                     title="Brokers"
+                    url={this.url}
+                    searchText={this.state.search}
                     onSearch={e => this.setState({ search: e.target.value })}>
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
@@ -49,6 +59,7 @@ export class Brokers extends React.Component<RouteComponentProps, State> {
                     search={r => r.host.includes(this.state.search)}
                     rows={this.state.rows}
                     raw={this.state.data}
+                    url={this.url}
                     columnDefs={this.getColumnDefs()}>
                 </DataView>}
             </>

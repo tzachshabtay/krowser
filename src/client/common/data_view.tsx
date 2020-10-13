@@ -5,8 +5,10 @@ import Tab from '@material-ui/core/Tab';
 import Typography from '@material-ui/core/Typography';
 import Box from '@material-ui/core/Box';
 import { CardView, CardViewProps } from "./card_view";
+import { Url } from "./url";
 
 interface DataViewProps extends GridProps, CardViewProps {
+    url: Url;
 }
 
 interface State {
@@ -40,10 +42,13 @@ function TabPanel(props: TabPanelProps) {
 }
 
 export const DataView: React.SFC<DataViewProps> = (props) => {
-    const [tab, setTab] = useState(0)
+    const showRaw = props.url.Get(`raw`) === `true`
+    const firstTab = showRaw ? 1 : 0;
+    const [tab, setTab] = useState(firstTab)
 
     const handleTabChange = (_: any, newValue: number) => {
         setTab(newValue)
+        props.url.Set({name: `raw`, val: newValue === 1 ? `true` : ``})
     };
 
     return (
