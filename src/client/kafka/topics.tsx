@@ -22,6 +22,12 @@ class ViewPartitionsButton extends React.Component<CellProps, {}> {
     }
 }
 
+class ViewConsumerGroupsButton extends React.Component<CellProps, {}> {
+    render() {
+        return <CellButton getUrl={() => `/topic/consumer_groups/${this.props.data.topic}`} {...this.props} />
+    }
+}
+
 class ViewConfigsButton extends React.Component<CellProps, {}> {
     render() {
         return <CellButton getUrl={() => `/topic/configs/${this.props.data.topic}`} {...this.props} />
@@ -80,7 +86,13 @@ export class Topics extends React.Component<RouteComponentProps, State> {
         }
         topic.offsets = data.offsets
         topic.config = data.config
+        topic.groups = data.groups
         topic.num_messages = sum
+        if (data.groups) {
+            topic.num_groups = data.groups.length
+        } else {
+            topic.num_groups = `Unknown`
+        }
         if (data.config) {
             topic.num_configs = data.config.resources[0].configEntries.length
         } else {
@@ -97,6 +109,7 @@ export class Topics extends React.Component<RouteComponentProps, State> {
             { headerName: "Topic", field: "topic" },
             { headerName: "#Partitions", field: "num_partitions", filter: "agNumberColumnFilter", cellRendererFramework: ViewPartitionsButton },
             { headerName: "#Messages", field: "num_messages", filter: "agNumberColumnFilter", cellRendererFramework: ViewMessagesButton },
+            { headerName: "#Consumer Groups", field: "num_groups", filter: "agNumberColumnFilter", cellRendererFramework: ViewConsumerGroupsButton },
             { headerName: "#Configs", field: "num_configs", filter: "agNumberColumnFilter", cellRendererFramework: ViewConfigsButton },
         ]
     }
@@ -116,7 +129,7 @@ export class Topics extends React.Component<RouteComponentProps, State> {
                     searchQuery={this.state.search}
                     search={r => r.topic.includes(this.state.search)}
                     rows={this.state.rows}
-                    raw={this.state.rows.map(r => ({...r.raw, num_messages: r.num_messages, offsets: r.offsets, config: r.config }))}
+                    raw={this.state.rows.map(r => ({...r.raw, num_messages: r.num_messages, offsets: r.offsets, config: r.config, groups: r.groups }))}
                     url={this.url}
                     columnDefs={this.getColumnDefs()}
                     onGridReady={this.onGridReady}
