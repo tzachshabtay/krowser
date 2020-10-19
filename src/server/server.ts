@@ -77,11 +77,18 @@ app.get("/api/topic/:topic", async (req, res) => {
 		const offsets = await withRetry("fetchTopicOffsets", () => kafka.Admin.fetchTopicOffsets(req.params.topic))
 		offsets.sort((o1, o2) => o1.partition - o2.partition)
 		try {
-			const config = await getTopicConfig(req.params.topic)
-			res.status(200).json({offsets, config})
+			const groups = await getTopicConsumerGroups(req.params.topic)
+			try {
+				const config = await getTopicConfig(req.params.topic)
+				res.status(200).json({offsets, groups, config})
+			}
+			catch (error) {
+				console.error(`Error while fetching config for topic ${req.params.topic}:`, error)
+				res.status(200).json({offsets, groups})
+			}
 		}
 		catch (error) {
-			console.error(`Error while fetching config for topic ${req.params.topic}:`, error)
+			console.error(`Error while fetching consumer groups for topic ${req.params.topic}:`, error)
 			res.status(200).json({offsets})
 		}
 	}
@@ -100,11 +107,19 @@ app.get("/api/topic/:topic/config", async (req, res) => {
 	}
 })
 
-app.get("/api/groups", async (req, res) => {
+app.get("/api/topic/:topic/consumer_groups", async (req, res) => {
 	try {
-		const consumers = await withRetry("listGroups", () => kafka.Admin.listGroups())
-		const ids = consumers.groups.map(g => g.groupId)
-		const groups = await withRetry("describeGroups", () => kafka.Admin.describeGroups(ids))
+		const groups = await getTopicConsumerGroups(req.params.topic)
+		const offsets = await withRetry("fetchTopicOffsets", () => kafka.Admin.fetchTopicOffsets(req.params.topic))
+		const partitonToOffset: Record<number, any> = {}
+		for (const offset of offsets) {
+			partitonToOffset[offset.partition] = offset
+		}
+		for (const group of groups) {
+			for (const offsets of group.offsets) {
+				offsets.partitionOffsets = partitonToOffset[offsets.partition]
+			}
+		}
 		res.status(200).json(groups)
 	}
 	catch (error) {
@@ -112,15 +127,51 @@ app.get("/api/groups", async (req, res) => {
 	}
 })
 
+app.get("/api/groups", async (req, res) => {
+	try {
+		const consumers = await withRetry("listGroups", () => kafka.Admin.listGroups())
+		const ids = consumers.groups.map(g => g.groupId)
+		const groups = await withRetry("describeGroups", () => kafka.Admin.describeGroups(ids))
+		modifyGroups(groups)
+		res.status(200).json(groups)
+	}
+	catch (error) {
+		console.error(error)
+		res.status(500).json({ error })
+	}
+})
+
 app.get("/api/members/:group", async (req, res) => {
 	try {
 		const groups = await withRetry("describeGroups", () => kafka.Admin.describeGroups([req.params.group])) as any //https://github.com/tulios/kafkajs/issues/756
+		modifyGroups(groups)
 		res.status(200).json(groups.groups[0].members)
 	}
 	catch (error) {
 		res.status(500).json({ error })
 	}
 })
+
+//todo: remove this when https://github.com/tulios/kafkajs/issues/755 is resolved
+function modifyGroups(groups: any) {
+	for (const group of (groups as any).groups) { //https://github.com/tulios/kafkajs/issues/756
+		for (const member of group.members) {
+			member.memberAssignment = stringFromArray(member.memberAssignment)
+			member.memberMetadata = stringFromArray(member.memberMetadata)
+		}
+	}
+}
+
+function stringFromArray(data: Buffer): string
+{
+	var count = data.length;
+	var str = "";
+
+	for(var index = 0; index < count; index += 1)
+		str += String.fromCharCode(data[index]);
+
+	return str;
+}
 
 app.get("/api/cluster", async (req, res) => {
 	try {
@@ -246,6 +297,23 @@ const getTopicConfig = async (topic: string): Promise<DescribeConfigResponse> =>
 	}))
 }
 
+const getTopicConsumerGroups = async (topic: string): Promise<any[]> => {
+	const consumers = await withRetry("listGroups", () => kafka.Admin.listGroups())
+	const ids = consumers.groups.filter(c => c.protocolType === `consumer`).map(g => g.groupId)
+	const groups = await withRetry("describeGroups", () => kafka.Admin.describeGroups(ids))
+	modifyGroups(groups)
+	let found = []
+	for (const group of (groups as any).groups) { //https://github.com/tulios/kafkajs/issues/756
+		for (const member of group.members) {
+			if (member.memberAssignment.includes(`${topic}\u0000`)) { //todo: we use suffix delimiter \u0000 but the prefix delimiter looks different each time?
+				const offsets = await withRetry("fetchOffsets", () => kafka.Admin.fetchOffsets({groupId: group.groupId, topic: topic}))
+				found.push({groupId: group.groupId, offsets})
+			}
+		}
+	}
+	return found
+}
+
 const getMessages = async (input: TopicQueryInput): Promise<MessagesResult> => {
 	const groupId = `krowser-${Date.now()}=${uuidv4()}`
 	const consumer = kafka.Kafka.consumer({ groupId })
@@ -267,12 +335,16 @@ const getMessages = async (input: TopicQueryInput): Promise<MessagesResult> => {
 			eachMessage: async ({ topic, partition, message }) => {
 				console.log(`---MESSAGE: ${message.offset}---`)
 				let schemaType : Type | undefined = undefined;
-				try {
-					const { type, value } = await schemaRegistry.decodeWithType<any>(message.value);
-					message.value = value;
-					schemaType = type;
-				} catch (error) {
-					console.log(`Not an avro message? error: ${error}`);
+				if (message.value === null) {
+					console.log(`Message value is null`)
+				} else {
+					try {
+						const { type, value } = await schemaRegistry.decodeWithType<any>(message.value);
+						message.value = value;
+						schemaType = type;
+					} catch (error) {
+						console.log(`Not an avro message? error: ${error}`);
+					}
 				}
 				const value = message.value ? message.value.toString() : "";
 				const key = message.key ? message.key.toString() : "";
