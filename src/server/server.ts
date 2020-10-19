@@ -110,6 +110,16 @@ app.get("/api/topic/:topic/config", async (req, res) => {
 app.get("/api/topic/:topic/consumer_groups", async (req, res) => {
 	try {
 		const groups = await getTopicConsumerGroups(req.params.topic)
+		const offsets = await withRetry("fetchTopicOffsets", () => kafka.Admin.fetchTopicOffsets(req.params.topic))
+		const partitonToOffset: Record<number, any> = {}
+		for (const offset of offsets) {
+			partitonToOffset[offset.partition] = offset
+		}
+		for (const group of groups) {
+			for (const offsets of group.offsets) {
+				offsets.partitionOffsets = partitonToOffset[offsets.partition]
+			}
+		}
 		res.status(200).json(groups)
 	}
 	catch (error) {

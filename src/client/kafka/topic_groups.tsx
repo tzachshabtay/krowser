@@ -33,7 +33,20 @@ export class TopicGroups extends React.Component<RouteComponentProps<{ topic: st
         const results: any[] = []
         for (const group of data) {
             for (const partition of group.offsets) {
-                results.push({name: group.groupId, partition: partition.partition, offset: partition.offset})
+                const high = parseInt(partition.partitionOffsets.high)
+                const offset = parseInt(partition.offset)
+                let lag = high - offset
+                if (offset === -1) {
+                    lag -= 1
+                }
+                results.push({
+                    name: group.groupId,
+                    partition: partition.partition,
+                    offset,
+                    high,
+                    low: partition.partitionOffsets.low,
+                    lag,
+                })
             }
         }
         const search = this.url.Get(`search`) || ``
@@ -45,6 +58,9 @@ export class TopicGroups extends React.Component<RouteComponentProps<{ topic: st
             { headerName: "Name", field: "name" },
             { headerName: "Partition", field: "partition", filter: "agNumberColumnFilter" },
             { headerName: "Offset", field: "offset", filter: "agNumberColumnFilter" },
+            { headerName: "Low", field: "low", filter: "agNumberColumnFilter" },
+            { headerName: "High", field: "high", filter: "agNumberColumnFilter" },
+            { headerName: "Lag", field: "lag", filter: "agNumberColumnFilter" },
         ]
     }
 
