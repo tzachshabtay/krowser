@@ -1,5 +1,7 @@
 # krowser
 
+<img align="middle" src="./public/favicon.svg">
+
 Web UI to browse [kafka](https://kafka.apache.org/) and [schema registry](https://docs.confluent.io/current/schema-registry/index.html).
 
 ## Features
