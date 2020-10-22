@@ -1,4 +1,8 @@
-# krowser
+<p align="center">
+    <img src="./logo.svg">
+</p>
+
+# Krowser
 
 Web UI to browse [kafka](https://kafka.apache.org/) and [schema registry](https://docs.confluent.io/current/schema-registry/index.html).
 

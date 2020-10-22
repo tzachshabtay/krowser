@@ -1,0 +1,29 @@
+<svg width="320" height="200" xmlns="http://www.w3.org/2000/svg">
+<style>
+        path {
+            fill: mediumorchid;
+            stroke: mediumorchid;
+        }
+        text {
+            fill: black;
+        }
+        @media (prefers-color-scheme: dark) {
+            path {
+                fill: ghostwhite;
+                stroke: ghostwhite;
+            }
+            text {
+            fill: deepskyblue;
+        }
+        }
+ </style>
+ <!-- Created with Method Draw - http://github.com/duopixel/Method-Draw/ -->
+ <g>
+  <title>Layer 1</title>
+  <text stroke="#FFFA8D" transform="translate(103.96990966796875,140.37510681152344) scale(1.0115162134170532,0.9025158882141113) translate(-103.96990966796875,-140.37510681152344) translate(103.70085906982422,140.23663330078125) scale(1.1534695625305176,1.1744335889816284) translate(-103.70085906982422,-140.23663330078125) matrix(14.243579285207943,0,0,9.192371718043752,-3857.6148665210158,-2028.791634931922) " xml:space="preserve" text-anchor="start" font-family="'Palatino Linotype', 'Book Antiqua', Palatino, serif" font-size="24" id="svg_1" y="241.44852" x="272.43126" stroke-width="0" fill="#000000">K</text>
+  <path stroke="#000000" transform="rotate(17.868803024291992 249.00621032714838,50.333549499511705) " id="svg_17" d="m222.63472,66.93271l26.3715,-33.19832l26.3715,33.19832l-52.74299,0z" stroke-width="4" fill="#000000"/>
+  <path stroke="#000000" transform="rotate(17.868803024291992 214.7205047607422,65.33355712890625) " id="svg_26" d="m186.14109,84.06148l28.57942,-37.45585l28.57942,37.45585l-57.15884,0z" stroke-width="4" fill="#000000"/>
+  <path stroke="#000000" transform="rotate(-78.2581787109375 245.30004882812497,161.6510467529297) " id="svg_27" d="m221.1736,183.78307l24.12646,-44.264l24.12646,44.264l-48.25292,0z" stroke-width="4" fill="#000000"/>
+  <path stroke="#000000" transform="rotate(-78.2581787109375 214.34768676757812,146.65106201171878) " id="svg_29" d="m181.88676,167.06891l32.46093,-40.83571l32.46094,40.83571l-64.92187,0z" stroke-width="4" fill="#000000"/>
+ </g>
+</svg>

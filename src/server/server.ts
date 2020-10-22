@@ -50,6 +50,7 @@ app.set("views", "public");
 
 console.log(__dirname)
 app.use("/assets", express.static(path.join(__dirname, "../client")));
+app.use("/public", express.static('public'));
 
 async function withRetry<TRes>(name: string, fun: () => Promise<TRes>): Promise<TRes> {
 	try {
