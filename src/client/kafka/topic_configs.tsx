@@ -19,7 +19,7 @@ export interface TopicConfigLinkProps {
     data: { configName: string };
 }
 
-const TopicConfigLink: React.SFC<TopicConfigLinkProps> = (props) => {
+const TopicConfigLink: React.FunctionComponent<TopicConfigLinkProps> = (props) => {
     return (
     <Link rel="noopener noreferrer" color="primary" target="_blank" href={`https://docs.confluent.io/current/installation/configuration/topic-configs.html#${props.data.configName}`}>
                 {props.data.configName}

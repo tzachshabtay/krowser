@@ -8,7 +8,7 @@ interface Props {
     onClick: () => void;
 }
 
-export const GoButton: React.SFC<Props> = (props) => {
+export const GoButton: React.FunctionComponent<Props> = (props) => {
     return (
     <div>
         <Button color="primary" variant="contained" style={{ marginTop: 18 }} disabled={props.isRunning}

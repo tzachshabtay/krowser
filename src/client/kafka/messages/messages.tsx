@@ -214,6 +214,8 @@ export class Messages extends React.Component<Props, State> {
                         search={this.state.search}
                         offset={this.url.Get(`offset`)}
                         limit={this.url.Get(`limit`)}
+                        fromTime={this.url.Get(`from_time`)}
+                        toTime={this.url.Get(`to_time`)}
                         onDataFetched={this.onDataFetched}
                         onDataFetchStarted={this.onDataFetchStarted}>
                     </SingleTopicInput>

@@ -16,7 +16,7 @@ export interface GridProps {
     onFilterChanged?(event: FilterChangedEvent): void;
 }
 
-export const Grid: React.SFC<GridProps> = (props) => {
+export const Grid: React.FunctionComponent<GridProps> = (props) => {
     let rows = props.rows
     if (props.searchQuery) {
         rows = rows.filter(props.search)

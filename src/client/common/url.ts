@@ -1,6 +1,6 @@
 import qs = require('qs');
 
-export type UrlProperty = `raw` | `search` | `offset` | `limit` | `searchFrom` | `topics`
+export type UrlProperty = `raw` | `search` | `offset` | `limit` | `searchFrom` | `topics` | `from_time` | `to_time`
 
 export class Url {
     obj: qs.ParsedQs

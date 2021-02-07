@@ -184,6 +184,18 @@ app.get("/api/cluster", async (req, res) => {
 	}
 })
 
+app.get("/api/offsets/:topic/:timestamp", async (req, res) => {
+	try {
+		const topic = req.params.topic
+		const timestamp = req.params.timestamp ? parseInt(req.params.timestamp.toString()) : 0
+		const entries = await withRetry("fetchTopicOffsetsByTimestamp", () => kafka.Admin.fetchTopicOffsetsByTimestamp(topic, timestamp))
+		res.status(200).json(entries)
+	}
+	catch (error) {
+		res.status(500).json({ error })
+	}
+})
+
 app.get("/api/messages/:topic/:partition", async (req, res) => {
 	try {
 		let limit = req.query.limit ? parseInt(req.query.limit.toString()) : 100
@@ -204,6 +216,10 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 			}
 			if (offset + limit > maxOffset) {
 				limit = maxOffset - offset
+			}
+			if (limit <= 0) {
+				res.status(200).json({messages: []})
+				return
 			}
 			const messages = await getMessages({topic, partition, limit, offset, search, timeout})
 			res.status(200).json(messages)
