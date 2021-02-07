@@ -14,6 +14,7 @@ Web UI to browse [kafka](https://kafka.apache.org/) and [schema registry](https:
 - Support for avro auto-detecting and decoding (via the schema registry). Different subject messages in a topic are supported as well (and as you filter for a specific event type it auto-hides all of the irrelevant columns belonging to the other messages).
 - The raw view shows the data in json format, and allows easy copying to clipboard
 - Server-side search for messages and the ability to search multiple topics at once
+- Filter messages via time range (or offsets)
 - Light and dark themes
 
 ## Images
