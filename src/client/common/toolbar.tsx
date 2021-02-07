@@ -75,7 +75,7 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const ThemeToggle: React.SFC = () => {
+const ThemeToggle: React.FunctionComponent = () => {
   const {theme, saveTheme} = useTheme()
 
   const handleTheme = (event: React.MouseEvent<HTMLElement>, newTheme: string) => {
@@ -110,7 +110,7 @@ interface Props {
     url: Url;
 }
 
-export const KafkaToolbar: React.SFC<Props> = (props) => {
+export const KafkaToolbar: React.FunctionComponent<Props> = (props) => {
   const classes = useStyles();
   const [anchorElement, setAnchorElement] = React.useState(null);
 

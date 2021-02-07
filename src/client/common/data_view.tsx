@@ -41,7 +41,7 @@ function TabPanel(props: TabPanelProps) {
     );
 }
 
-export const DataView: React.SFC<DataViewProps> = (props) => {
+export const DataView: React.FunctionComponent<DataViewProps> = (props) => {
     const showRaw = props.url.Get(`raw`) === `true`
     const firstTab = showRaw ? 1 : 0;
     const [tab, setTab] = useState(firstTab)

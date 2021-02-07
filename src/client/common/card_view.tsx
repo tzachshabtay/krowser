@@ -7,7 +7,7 @@ export interface CardViewProps {
     searchQuery: string;
 }
 
-export const CardView: React.SFC<CardViewProps> = (props) => {
+export const CardView: React.FunctionComponent<CardViewProps> = (props) => {
     let raw = props.raw
     if (props.searchQuery) {
         raw = filterJson(props.raw, props.searchQuery)

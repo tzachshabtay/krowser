@@ -6,7 +6,7 @@ interface ErrorProps {
     error: any
 }
 
-export const ErrorMsg: React.SFC<ErrorProps> = (props) => {
+export const ErrorMsg: React.FunctionComponent<ErrorProps> = (props) => {
     if (!props.error) {
         return null
     }

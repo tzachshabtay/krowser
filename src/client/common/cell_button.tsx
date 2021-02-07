@@ -11,7 +11,7 @@ export interface CellButtonProps extends CellProps {
     getUrl: () => string;
 }
 
-export const CellButton: React.SFC<CellButtonProps> = (props) => {
+export const CellButton: React.FunctionComponent<CellButtonProps> = (props) => {
     let msg = "Loading"
     if (props.value || props.value === 0) {
         msg = props.value.toString()
