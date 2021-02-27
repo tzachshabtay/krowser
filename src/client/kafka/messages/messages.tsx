@@ -224,7 +224,7 @@ export class Messages extends React.Component<Props, State> {
                 { this.state.error && (<Alert severity="error">{this.state.error}</Alert>)}
                 <ErrorMsg error={this.state.error} prefix="Failed to fetch data. Error: "></ErrorMsg>
                 <DataView
-                    search={r => r.rowValue.includes(this.state.search) || r.rowKey.includes(this.state.search)}
+                    search={r => r.rowValue.includes(this.state.search) || r.rowKey.includes(this.state.search) || r.rowType.includes(this.state.search)}
                     searchQuery={this.state.search}
                     rows={this.state.rows}
                     raw={this.state.rows.map(r => r.rowJson)}
