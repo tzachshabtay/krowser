@@ -33,6 +33,7 @@ export const Grid: React.FunctionComponent<GridProps> = (props) => {
                 onGridReady={props.onGridReady}
                 onFilterChanged={props.onFilterChanged}
                 enableCellTextSelection={true}
+                pagination={true}
             >
             </AgGridReact>
         </div>
