@@ -392,7 +392,7 @@ const getMessages = async (input: TopicQueryInput): Promise<MessagesResult> => {
 				numConsumed++
 				let filteredOut = false
 				if (input.search) {
-					if (!value.includes(input.search) && !key.includes(input.search)) {
+					if (!value.includes(input.search) && !key.includes(input.search) && !(schemaType?.name?.includes(input.search) ?? true)) {
 						filteredOut = true
 						console.log(`Ignoring message from offset ${message.offset}, filtered out by search`)
 					}
