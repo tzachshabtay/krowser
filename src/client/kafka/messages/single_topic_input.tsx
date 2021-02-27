@@ -1,14 +1,19 @@
 import React from "react";
 import TextField from '@material-ui/core/TextField';
 import CircularProgress from '@material-ui/core/CircularProgress';
+import LinearProgress from '@material-ui/core/LinearProgress';
 import Select from '@material-ui/core/Select';
 import InputLabel from '@material-ui/core/InputLabel';
 import FormControl from '@material-ui/core/FormControl';
 import Toolbar from '@material-ui/core/Toolbar';
 import MenuItem from '@material-ui/core/MenuItem';
+import Fade from '@material-ui/core/Fade';
 import { GoButton } from './go_button';
 import { ErrorMsg} from '../../common/error_msg';
 import { Url } from '../../common/url';
+import Box from '@material-ui/core/Box';
+import Typography from '@material-ui/core/Typography';
+
 
 interface Props {
     topic: string;
@@ -23,6 +28,13 @@ interface Props {
     onDataFetchStarted: () => void;
 }
 
+type progress = {
+    min: number;
+    max: number;
+    from: number;
+    to: number;
+}
+
 type State = {
     searchBy: "offset" | "time";
     partition: string;
@@ -34,6 +46,7 @@ type State = {
     toTime: string;
     partitions: any[];
     error: any;
+    progress: progress;
 }
 
 interface InputProps{
@@ -96,7 +109,13 @@ export class SingleTopicInput extends React.Component<Props, State> {
         loadingPartitions: true,
         partition: this.props.partition || "0",
         error: "",
-        searchBy: "offset"
+        searchBy: "offset",
+        progress: {
+            min: 0,
+            max: 0,
+            from: 0,
+            to: 0,
+        },
     }
 
     async componentDidMount() {
@@ -215,20 +234,33 @@ export class SingleTopicInput extends React.Component<Props, State> {
     }
 
     fetchMessages = async (timeout: number) => {
-        this.setState({ loadingMessages: true })
+        this.setState({ loadingMessages: true, progress: {
+            min: 0,
+            max: 0,
+            from: 0,
+            to: 0,
+        }})
         this.props.onDataFetchStarted()
         const topic = this.props.topic
         let cursor = this.state.offset
-        const end = cursor + this.state.limit
+        const max = cursor + this.state.limit
         let out: any = null
         let limit = this.state.limit
         if (limit > 1000) {
             limit = 1000
         }
-        if (cursor >= end) {
+        if (cursor >= max) {
             this.props.onDataFetched({messages: []})
         }
-        while (cursor < end) {
+        const min = cursor
+        while (cursor < max) {
+            const to = Math.min(max, cursor + limit)
+            this.setState({ progress: {
+                min,
+                max,
+                from: cursor,
+                to,
+            }})
             const response = await fetch(`/api/messages/${topic}/${this.state.partition}?limit=${limit}&offset=${cursor}&search=${this.props.search}&timeout=${timeout}`)
             cursor += limit
             const data = await response.json()
@@ -243,6 +275,12 @@ export class SingleTopicInput extends React.Component<Props, State> {
             if (data.hasTimeout) {
                 out.hasTimeout = data.hasTimeout
             }
+            this.setState({ progress: {
+                min,
+                max,
+                from: to,
+                to: to,
+            }})
             this.props.onDataFetched(out)
             if (out.error || out.hasTimeout) {
                 break
@@ -334,7 +372,32 @@ export class SingleTopicInput extends React.Component<Props, State> {
                     </GoButton>
             </Toolbar>
             <ErrorMsg error={this.state.error} prefix="Failed to fetch partitions. Error: "></ErrorMsg>
+            {this.renderProgress()}
             </>
+        )
+    }
+
+    normalizeProgress(value: number) {
+        return (value - this.state.progress.min) * 100 / (this.state.progress.max - this.state.progress.min)
+    }
+
+    renderProgress() {
+        return (
+            <Fade in={this.state.loadingMessages && this.state.progress.max !== 0} style={{
+                transitionDelay: this.state.loadingMessages && this.state.progress.max !== 0 ? '1500ms' : '0ms',
+              }}
+              unmountOnExit>
+                  <Box alignItems="center" style={{float: "right", paddingRight: 15, width: "40%"}}>
+                      <Box minWidth={35} style={{padding: 10}}>
+                          <Typography variant="body2" color="textSecondary" align="center">{`Loading offset ${this.state.progress.from} (${Math.round(
+                          this.normalizeProgress(this.state.progress.from),
+                          )}%)`}</Typography>
+                      </Box>
+                      <Box width="100%" mr={1}>
+                          <LinearProgress variant="buffer" value={this.normalizeProgress(this.state.progress.from)} valueBuffer={this.normalizeProgress(this.state.progress.to)}/>
+                      </Box>
+                  </Box>
+              </Fade>
         )
     }
 }
