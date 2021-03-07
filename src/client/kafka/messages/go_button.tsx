@@ -15,7 +15,7 @@ import useRecursiveTimeout from './use_recursive_timeout';
 
 interface Props {
     isRunning: boolean;
-    onRun: () => void;
+    onRun: () => Promise<void>;
     onCancel: () => void;
 }
 

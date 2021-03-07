@@ -173,7 +173,24 @@ export class MultiTopicsInput extends React.Component<Props, State> {
                     />
                     </div>
                     <GoButton
-                        onRun={() => { this.setState({isCanceled: false, abortController: new AbortController()}, async () => await this.fetchMessages())}}
+                        onRun={() => {
+                            return new Promise((resolve, reject) => {
+                                this.setState({isCanceled: false, abortController: new AbortController()},
+                                async () => {
+                                    try {
+                                        await this.fetchMessages()
+                                        resolve()
+                                    } catch (error) {
+                                        if (error.name === 'AbortError') {
+                                            this.setState({loadingMessages: false})
+                                            resolve()
+                                        } else {
+                                            reject(error)
+                                        }
+                                    }
+                                })
+                            })
+                        }}
                         onCancel={()=>{ this.setState({isCanceled: true }, () => this.state.abortController?.abort())}}
                         isRunning={this.state.loadingMessages}>
                     </GoButton>
