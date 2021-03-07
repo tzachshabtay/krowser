@@ -47,6 +47,8 @@ type State = {
     partitions: any[];
     error: any;
     progress: progress;
+    isCanceled: boolean;
+    abortController: AbortController | null;
 }
 
 interface InputProps{
@@ -116,6 +118,8 @@ export class SingleTopicInput extends React.Component<Props, State> {
             from: 0,
             to: 0,
         },
+        isCanceled: false,
+        abortController: null,
     }
 
     async componentDidMount() {
@@ -254,6 +258,9 @@ export class SingleTopicInput extends React.Component<Props, State> {
         }
         const min = cursor
         while (cursor < max) {
+            if (this.state.isCanceled) {
+                break
+            }
             const to = Math.min(max, cursor + limit)
             this.setState({ progress: {
                 min,
@@ -261,9 +268,18 @@ export class SingleTopicInput extends React.Component<Props, State> {
                 from: cursor,
                 to,
             }})
-            const response = await fetch(`/api/messages/${topic}/${this.state.partition}?limit=${limit}&offset=${cursor}&search=${this.props.search}&timeout=${timeout}`)
+            const response = await fetch(
+                `/api/messages/${topic}/${this.state.partition}?limit=${limit}&offset=${cursor}&search=${this.props.search}&timeout=${timeout}`,
+                {signal: this.state.abortController?.signal}
+            )
+            if (this.state.isCanceled) {
+                break
+            }
             cursor += limit
             const data = await response.json()
+            if (this.state.isCanceled) {
+                break
+            }
             if (!out) {
                 out = data
             } else if (data.messages) {
@@ -367,7 +383,8 @@ export class SingleTopicInput extends React.Component<Props, State> {
                     </>}
                     </div>
                     <GoButton
-                        onClick={async () => { await this.onFetchMessagesClicked() }}
+                        onRun={() => { this.setState({isCanceled: false, abortController: new AbortController()}, async () => await this.onFetchMessagesClicked()) }}
+                        onCancel={() => this.setState({isCanceled: true}, () => this.state.abortController?.abort())}
                         isRunning={this.state.loadingMessages}>
                     </GoButton>
             </Toolbar>
