@@ -30,11 +30,23 @@ type State = {
     searchFrom: string;
     limit: number;
     error: any;
+    isCanceled: boolean;
+    abortController: AbortController | null;
 }
 
 
 export class MultiTopicsInput extends React.Component<Props, State> {
-    state: State = { topics: [], selectedTopics: [], searchFrom: `End`, limit: 100, loadingMessages: false, loadingTopics: true, error: "" }
+    state: State = {
+        topics: [],
+        selectedTopics: [],
+        searchFrom: `End`,
+        limit: 100,
+        loadingMessages: false,
+        loadingTopics: true,
+        error: "",
+        isCanceled: false,
+        abortController: null,
+    }
 
     async componentDidMount() {
         const newState: any = {};
@@ -62,12 +74,22 @@ export class MultiTopicsInput extends React.Component<Props, State> {
         this.setState({topics, loadingTopics: false})
     }
 
-    async fetchMessages() {
+    fetchMessages = async () => {
         this.setState({ loadingMessages: true })
         this.props.onDataFetchStarted()
         const topics = this.state.selectedTopics.join(`,`)
-        const response = await fetch(`/api/messages-cross-topics/${topics}?limit=${this.state.limit}&search_from=${this.state.searchFrom}&search=${this.props.search}`)
+        const response = await fetch(
+            `/api/messages-cross-topics/${topics}?limit=${this.state.limit}&search_from=${this.state.searchFrom}&search=${this.props.search}`,
+            {signal: this.state.abortController?.signal})
+        if (this.state.isCanceled) {
+            this.setState({loadingMessages: false})
+            return
+        }
         const data = await response.json()
+        if (this.state.isCanceled) {
+            this.setState({loadingMessages: false})
+            return
+        }
         this.props.onDataFetched(data)
         this.setState({loadingMessages: false})
     }
@@ -151,7 +173,25 @@ export class MultiTopicsInput extends React.Component<Props, State> {
                     />
                     </div>
                     <GoButton
-                        onClick={async () => { await this.fetchMessages() }}
+                        onRun={() => {
+                            return new Promise((resolve, reject) => {
+                                this.setState({isCanceled: false, abortController: new AbortController()},
+                                async () => {
+                                    try {
+                                        await this.fetchMessages()
+                                        resolve()
+                                    } catch (error) {
+                                        if (error.name === 'AbortError') {
+                                            this.setState({loadingMessages: false})
+                                            resolve()
+                                        } else {
+                                            reject(error)
+                                        }
+                                    }
+                                })
+                            })
+                        }}
+                        onCancel={()=>{ this.setState({isCanceled: true }, () => this.state.abortController?.abort())}}
                         isRunning={this.state.loadingMessages}>
                     </GoButton>
             </Toolbar>
