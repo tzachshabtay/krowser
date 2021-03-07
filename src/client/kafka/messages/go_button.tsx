@@ -27,7 +27,7 @@ export const GoButton: React.FunctionComponent<Props> = (props) => {
     const anchorRef = React.useRef<HTMLDivElement>(null);
     const [refreshInfo, setRefreshInfo] = React.useState({selectedIndex: 0, refreshId: -1});
 
-    useRecursiveTimeout(props.onRun, refreshInfo.selectedIndex > 0 ? durations[refreshInfo.selectedIndex] : null)
+    useRecursiveTimeout(props.onRun, refreshInfo.selectedIndex > 0 ? durations[refreshInfo.selectedIndex] : null, refreshInfo.refreshId)
 
     const handleMenuItemClick = (
         event: React.MouseEvent<HTMLLIElement, MouseEvent>,
