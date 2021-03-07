@@ -11,6 +11,7 @@ import Popper from '@material-ui/core/Popper';
 import MenuItem from '@material-ui/core/MenuItem';
 import MenuList from '@material-ui/core/MenuList';
 import Typography from '@material-ui/core/Typography';
+import useRecursiveTimeout from './use_recursive_timeout';
 
 interface Props {
     isRunning: boolean;
@@ -26,23 +27,7 @@ export const GoButton: React.FunctionComponent<Props> = (props) => {
     const anchorRef = React.useRef<HTMLDivElement>(null);
     const [refreshInfo, setRefreshInfo] = React.useState({selectedIndex: 0, refreshId: -1});
 
-    const refreshInfoContainer = { refreshInfo }
-
-    React.useEffect(() => {
-        if (refreshInfo.selectedIndex > 0) {
-            autoRefresh(refreshInfo.refreshId, refreshInfo.selectedIndex)
-        }
-    }, [refreshInfo])
-
-    const autoRefresh = (refreshId: number, index: number) => {
-        setTimeout(() => {
-            if (refreshId !== refreshInfoContainer.refreshInfo.refreshId || index !== refreshInfoContainer.refreshInfo.selectedIndex) {
-                return
-            }
-            props.onRun()
-            autoRefresh(refreshId, index)
-        }, durations[index])
-    }
+    useRecursiveTimeout(props.onRun, refreshInfo.selectedIndex > 0 ? durations[refreshInfo.selectedIndex] : null)
 
     const handleMenuItemClick = (
         event: React.MouseEvent<HTMLLIElement, MouseEvent>,
