@@ -3,7 +3,7 @@ import { RouteComponentProps } from "react-router-dom";
 import { KafkaToolbar} from '../../common/toolbar';
 import { DataView} from '../../common/data_view';
 import { ErrorMsg} from '../../common/error_msg';
-import { SingleTopicInput} from './single_topic_input';
+import { SingleTopicInput, SearchBy} from './single_topic_input';
 import { MultiTopicsInput} from './multi_topics_input';
 import Alert from '@material-ui/lab/Alert';
 import { GridReadyEvent, GridApi, ColumnApi, FilterChangedEvent } from 'ag-grid-community';
@@ -216,6 +216,7 @@ export class Messages extends React.Component<Props, State> {
                         limit={this.url.Get(`limit`)}
                         fromTime={this.url.Get(`from_time`)}
                         toTime={this.url.Get(`to_time`)}
+                        searchBy={(this.url.Get(`search_by`) ?? `offset`) as SearchBy}
                         onDataFetched={this.onDataFetched}
                         onDataFetchStarted={this.onDataFetchStarted}>
                     </SingleTopicInput>

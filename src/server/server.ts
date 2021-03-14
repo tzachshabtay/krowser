@@ -98,6 +98,17 @@ app.get("/api/topic/:topic", async (req, res) => {
 	}
 })
 
+app.get("/api/topic/:topic/offsets", async (req, res) => {
+	try {
+		const offsets = await withRetry("fetchTopicOffsets", () => kafka.Admin.fetchTopicOffsets(req.params.topic))
+		offsets.sort((o1, o2) => o1.partition - o2.partition)
+		res.status(200).json({offsets})
+	}
+	catch (error) {
+		res.status(500).json({ error })
+	}
+})
+
 app.get("/api/topic/:topic/config", async (req, res) => {
 	try {
 		const config = await getTopicConfig(req.params.topic)
