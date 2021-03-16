@@ -29,16 +29,16 @@ const registerSchema = async (raw, name) => {
 class test { }
 class test_nested { }
 
-const produceTestMessage = async (i) => {
+const produceTestMessage = async (i, partition) => {
     const producer = await kafkaAvro.getProducer()
     const data = new test()
     data.long_field = 10
     data.int_field = i
     data.enum_field = 'option1'
-    producer.produce('test', -1, data, 'key');
+    producer.produce('test', partition, data, 'key');
 }
 
-const produceNestedTestMessage = async (i) => {
+const produceNestedTestMessage = async (i, partition) => {
     const producer = await kafkaAvro.getProducer()
     const data = new test_nested()
     data.nullable_long = { "long": 5 }
@@ -54,16 +54,30 @@ const produceNestedTestMessage = async (i) => {
             string_field: "test",
         }
     }
-    producer.produce('test', -1, data, 'key');
+    producer.produce('test', partition, data, 'key');
 }
 
 const start = async () => {
     await registerSchema(testRaw, `test-value`)
     await registerSchema(nestedTestRaw, `test_nested-value`)
+    const admin = new Kafka({
+        clientId: 'krowser-inserter',
+        brokers: ['localhost:9092'],
+    }).admin()
+    await admin.connect()
+    try {
+        await admin.createPartitions({ topicPartitions: [{ topic: `test`, count: 5 }] })
+    } catch (error) {
+        console.error(`error while creating partitions (they might already exist): ${error}`)
+    }
     await kafkaAvro.init()
-    for (let i = 0; i < 5; i++) {
-        await produceTestMessage(i)
-        await produceNestedTestMessage(i)
+    const partitions = [0, 1, 2]
+    for (const partition of partitions) {
+        console.log(`Partition: ${partition}`)
+        for (let i = 0; i < 5; i++) {
+            await produceTestMessage(i, partition)
+            await produceNestedTestMessage(i, partition)
+        }
     }
 }
 

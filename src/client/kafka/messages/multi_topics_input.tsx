@@ -9,6 +9,7 @@ import Toolbar from '@material-ui/core/Toolbar';
 import MenuItem from '@material-ui/core/MenuItem';
 import ListItemText from '@material-ui/core/ListItemText';
 import { GoButton } from './go_button';
+import { AllPartitions } from './single_topic_input';
 import { ErrorMsg} from '../../common/error_msg';
 import { Url } from '../../common/url';
 
@@ -19,7 +20,7 @@ interface Props {
     searchFrom?: any;
     limit?: any;
     onDataFetched: (data: any) => void;
-    onDataFetchStarted: () => void;
+    onDataFetchStarted: (partition: string) => void;
 }
 
 type State = {
@@ -76,7 +77,7 @@ export class MultiTopicsInput extends React.Component<Props, State> {
 
     fetchMessages = async () => {
         this.setState({ loadingMessages: true })
-        this.props.onDataFetchStarted()
+        this.props.onDataFetchStarted(AllPartitions)
         const topics = this.state.selectedTopics.join(`,`)
         const response = await fetch(
             `/api/messages-cross-topics/${topics}?limit=${this.state.limit}&search_from=${this.state.searchFrom}&search=${this.props.search}`,

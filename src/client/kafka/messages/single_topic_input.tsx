@@ -16,6 +16,8 @@ import Typography from '@material-ui/core/Typography';
 
 export type SearchBy = "offset" | "time" | "newest" | "oldest";
 
+export const AllPartitions = `all`;
+
 interface Props {
     topic: string;
     partition?: string;
@@ -27,7 +29,7 @@ interface Props {
     searchBy: SearchBy;
     url: Url;
     onDataFetched: (data: any) => void;
-    onDataFetchStarted: () => void;
+    onDataFetchStarted: (partition: string) => void;
 }
 
 type progress = {
@@ -35,6 +37,7 @@ type progress = {
     max: number;
     from: number;
     to: number;
+    partition: string;
 }
 
 type State = {
@@ -118,6 +121,7 @@ export class SingleTopicInput extends React.Component<Props, State> {
             max: 0,
             from: 0,
             to: 0,
+            partition: "",
         },
         isCanceled: false,
         abortController: null,
@@ -143,7 +147,7 @@ export class SingleTopicInput extends React.Component<Props, State> {
                 `Partition: ${r.partition} (Low- ${r.low}, High- ${r.high}, Current- ${r.offset})`;
             return { label: label, value: r.partition.toString(), isEmpty }
         })
-        const newState: any = { loadingPartitions: false, partitions: results }
+        const newState: any = { loadingPartitions: false, partitions: [{label: `All Partitions`, value: AllPartitions}, ...results] }
         if (this.props.limit !== undefined) {
             newState.limit = parseInt(this.props.limit)
         }
@@ -158,29 +162,16 @@ export class SingleTopicInput extends React.Component<Props, State> {
             newState.fromTime = this.props.fromTime
         }
         const offset = await this.getInitialOffset(partitionIndex, data)
-        if (this.props.toTime !== undefined) {
-            newState.toTime = this.props.toTime
-            if (offset) {
-                const partition = data.offsets[parseInt(partitionIndex)]
-                let toOffset = await this.getOffsetForTime(partition.partition, this.props.toTime)
-                if (toOffset !== undefined) {
-                    newState.limit = toOffset - offset
-                }
-            }
-        }
-        if (offset === undefined) {
-            this.setState(newState, this.updateUrl)
-        } else {
-            newState.offset = offset
-            this.setState(newState, this.fetchMessagesOnStart)
-        }
+        newState.offset = offset
+        newState.toTime = this.props.toTime ?? ""
+        this.setState(newState, this.fetchMessagesOnStart)
     }
 
     getInitialOffset = async (partitionIndex: string | undefined, data: any): Promise<number | undefined> => {
         if (this.props.offset !== undefined) {
             return parseInt(this.props.offset)
         }
-        if (partitionIndex === undefined) {
+        if (partitionIndex === undefined || partitionIndex === AllPartitions) {
             return undefined
         }
         const partition = data.offsets[parseInt(partitionIndex)]
@@ -220,46 +211,73 @@ export class SingleTopicInput extends React.Component<Props, State> {
         await this.fetchMessages(20000)
     }
 
-    fetchOldest = async (timeout: number) => {
-        const offsets = await this.getPartitionOffsets()
-        if (offsets === undefined) {
-            return
+    getSelectedPartitions = (): string[] => {
+        if (this.state.partition !== AllPartitions) {
+            return [this.state.partition]
         }
-        await this.setStateAsync({offset: parseInt(offsets.low)})
-        await this.fetchMessagesByOffset(timeout)
+        return this.state.partitions.slice(1).map(r => r.value)
+    }
+
+    fetchOldest = async (timeout: number) => {
+        const partitions = this.getSelectedPartitions()
+        let out: any = null
+        for (const partition of partitions) {
+            const offsets = await this.getPartitionOffsets(partition)
+            if (offsets === undefined) {
+                return
+            }
+            await this.setStateAsync({offset: parseInt(offsets.low)})
+            out = await this.fetchMessagesForPartition(timeout, partition, out)
+        }
     }
 
     fetchNewest = async (timeout: number) => {
-        const offsets = await this.getPartitionOffsets()
-        if (offsets === undefined) {
-            return
+        const partitions = this.getSelectedPartitions()
+        let out: any = null
+        for (const partition of partitions) {
+            const offsets = await this.getPartitionOffsets(partition)
+            if (offsets === undefined) {
+                return
+            }
+            await this.setStateAsync({offset: parseInt(offsets.high) - this.state.limit})
+            out = await this.fetchMessagesForPartition(timeout, partition, out)
         }
-        await this.setStateAsync({offset: parseInt(offsets.high) - this.state.limit})
-        await this.fetchMessagesByOffset(timeout)
     }
 
-    getPartitionOffsets = async () => {
+    getPartitionOffsets = async (partition: string) => {
         const response = await fetch(`/api/topic/${this.props.topic}/offsets`)
         const data: any = await response.json()
         if (data.error) {
             this.setState({loadingMessages: false, error: data.error})
             return undefined
         }
-        return data.offsets.find((el: any) => el.partition.toString() === this.state.partition.toString())
+        return data.offsets.find((el: any) => el.partition.toString() === partition.toString())
     }
 
     fetchByTime = async (timeout: number) => {
-        const fromOffset = await this.getOffsetForTime(parseInt(this.state.partition), this.state.fromTime)
-        if (fromOffset === undefined) {
-            return
+        const partitions = this.getSelectedPartitions()
+        let out: any = null
+        for (const partition of partitions) {
+            const fromOffset = await this.getOffsetForTime(parseInt(partition), this.state.fromTime)
+            if (fromOffset === undefined) {
+                return
+            }
+            const toOffset = await this.getOffsetForTime(parseInt(partition), this.state.toTime)
+            if (toOffset === undefined) {
+                return
+            }
+            const limit = toOffset - fromOffset
+            await this.setStateAsync({offset: fromOffset, limit})
+            out = await this.fetchMessagesForPartition(timeout, partition, out)
         }
-        const toOffset = await this.getOffsetForTime(parseInt(this.state.partition), this.state.toTime)
-        if (toOffset === undefined) {
-            return
+    }
+
+    fetchByOffsets = async (timeout: number) => {
+        const partitions = this.getSelectedPartitions()
+        let out: any = null
+        for (const partition of partitions) {
+            out = await this.fetchMessagesForPartition(timeout, partition, out)
         }
-        const limit = toOffset - fromOffset
-        await this.setStateAsync({offset: fromOffset, limit})
-        await this.fetchMessagesByOffset(timeout)
     }
 
     fetchMessages = async (timeout: number) => {
@@ -268,12 +286,13 @@ export class SingleTopicInput extends React.Component<Props, State> {
             max: 0,
             from: 0,
             to: 0,
+            partition: "",
         }})
         try {
-            this.props.onDataFetchStarted()
+            this.props.onDataFetchStarted(this.state.partition)
             switch (this.state.searchBy) {
                 case `offset`:
-                    await this.fetchMessagesByOffset(timeout)
+                    await this.fetchByOffsets(timeout)
                     break
                 case `time`:
                     await this.fetchByTime(timeout)
@@ -294,17 +313,19 @@ export class SingleTopicInput extends React.Component<Props, State> {
         }
     }
 
-    fetchMessagesByOffset = async (timeout: number) => {
+    fetchMessagesForPartition = async (timeout: number, partition: string, out: any): Promise<any> => {
         const topic = this.props.topic
         let cursor = this.state.offset
+        if (cursor === undefined) {
+            return null
+        }
         const max = cursor + this.state.limit
-        let out: any = null
         let limit = this.state.limit
         if (limit > 1000) {
             limit = 1000
         }
         if (cursor >= max) {
-            this.props.onDataFetched({messages: []})
+            this.props.onDataFetched({messages: out ?? []})
         }
         const min = cursor
         while (cursor < max) {
@@ -317,9 +338,10 @@ export class SingleTopicInput extends React.Component<Props, State> {
                 max,
                 from: cursor,
                 to,
+                partition: this.state.partition === AllPartitions ? `Partition ${partition}: ` : "",
             }})
             const response = await fetch(
-                `/api/messages/${topic}/${this.state.partition}?limit=${limit}&offset=${cursor}&search=${this.props.search}&timeout=${timeout}`,
+                `/api/messages/${topic}/${partition}?limit=${limit}&offset=${cursor}&search=${this.props.search}&timeout=${timeout}`,
                 {signal: this.state.abortController?.signal}
             )
             if (this.state.isCanceled) {
@@ -346,12 +368,14 @@ export class SingleTopicInput extends React.Component<Props, State> {
                 max,
                 from: to,
                 to: to,
+                partition: this.state.partition === AllPartitions ? `Partition ${partition}: ` : "",
             }})
             this.props.onDataFetched(out)
             if (out.error || out.hasTimeout) {
                 break
             }
         }
+        return out
     }
 
     updateUrl = () => {
@@ -474,7 +498,7 @@ export class SingleTopicInput extends React.Component<Props, State> {
               unmountOnExit>
                   <Box alignItems="center" style={{float: "right", paddingRight: 15, width: "40%"}}>
                       <Box minWidth={35} style={{padding: 10}}>
-                          <Typography variant="body2" color="textSecondary" align="center">{`Loading offset ${this.state.progress.from} (${Math.round(
+                          <Typography variant="body2" color="textSecondary" align="center">{`${this.state.progress.partition}Loading offset ${this.state.progress.from} (${Math.round(
                           this.normalizeProgress(this.state.progress.from),
                           )}%)`}</Typography>
                       </Box>
