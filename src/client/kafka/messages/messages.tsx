@@ -3,7 +3,7 @@ import { RouteComponentProps } from "react-router-dom";
 import { KafkaToolbar} from '../../common/toolbar';
 import { DataView} from '../../common/data_view';
 import { ErrorMsg} from '../../common/error_msg';
-import { SingleTopicInput, SearchBy} from './single_topic_input';
+import { SingleTopicInput, SearchBy, AllPartitions} from './single_topic_input';
 import { MultiTopicsInput} from './multi_topics_input';
 import Alert from '@material-ui/lab/Alert';
 import { GridReadyEvent, GridApi, ColumnApi, FilterChangedEvent } from 'ag-grid-community';
@@ -18,10 +18,18 @@ type State = {
     error: any;
     warning: string;
     customCols: {cols: {}};
+    partition?: string;
 }
 
 export class Messages extends React.Component<Props, State> {
-    state: State = { search: "", rows: [], customCols: {cols: {}}, error: "", warning: "" }
+    state: State = {
+        search: "",
+        rows: [],
+        customCols: {cols: {}},
+        error: "",
+        warning: "",
+        partition: this.props.match.params.partition,
+    }
     api: GridApi | null = null;
     columnApi: ColumnApi | null = null;
     url: Url;
@@ -108,6 +116,8 @@ export class Messages extends React.Component<Props, State> {
         ]
         if (this.props.match.params.topic === undefined) {
             cols.push({headerName: "Topic", field: "rowTopic"})
+        }
+        if (this.state.partition === AllPartitions) {
             cols.push({headerName: "Partition", field: "rowPartition"})
         }
         this.addCustomColumns(cols, this.state.customCols.cols, ``)
@@ -159,8 +169,8 @@ export class Messages extends React.Component<Props, State> {
         return `${month}/${day}/${year} ${hour}:${minute}:${second}.${millis}`
     }
 
-    onDataFetchStarted = () => {
-        this.setState({error: "", warning: ""})
+    onDataFetchStarted = (partition: string) => {
+        this.setState({error: "", warning: "", partition})
     }
 
     onDataFetched = (data: any) => {

@@ -361,6 +361,10 @@ const getMessages = async (input: TopicQueryInput): Promise<MessagesResult> => {
 		await consumer.run({
 			autoCommit: false,
 			eachMessage: async ({ topic, partition, message }) => {
+				if (partition !== input.partition) {
+					console.log(`ignoreing message from partition ${partition} (offset ${message.offset}), expecting partition ${input.partition}`)
+					return
+				}
 				console.log(`---MESSAGE: ${message.offset}---`)
 				let schemaType : Type | undefined = undefined;
 				if (message.value === null) {
