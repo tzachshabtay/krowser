@@ -3,13 +3,14 @@ import { RouteComponentProps } from "react-router-dom";
 import { KafkaToolbar} from '../../common/toolbar';
 import { DataView} from '../../common/data_view';
 import { ErrorMsg} from '../../common/error_msg';
-import { SingleTopicInput, SearchBy, AllPartitions} from './single_topic_input';
+import { SingleTopicInput} from './single_topic_input';
+import { SearchBy, AllPartitions} from './fetcher';
 import { MultiTopicsInput} from './multi_topics_input';
 import Alert from '@material-ui/lab/Alert';
 import { GridReadyEvent, GridApi, ColumnApi, FilterChangedEvent } from 'ag-grid-community';
 import { Url } from "../../common/url";
 
-interface Props extends RouteComponentProps<{ topic?: string, partition?: string }> {
+interface Props extends RouteComponentProps<{ topic?: string, partition?: string, topics?: string }> {
 }
 
 type State = {
@@ -211,9 +212,11 @@ export class Messages extends React.Component<Props, State> {
                         onDataFetched={this.onDataFetched}
                         onDataFetchStarted={this.onDataFetchStarted}
                         url={this.url}
-                        limit={this.url.Get(`limit`)}
-                        searchFrom={this.url.Get(`searchFrom`)}
-                        selectedTopics={this.url.Get(`topics`)}
+                        limit={this.url.Get(`limit`) ?? 5}
+                        fromTime={this.url.Get(`from_time`)}
+                        toTime={this.url.Get(`to_time`)}
+                        searchBy={(this.url.Get(`search_by`) ?? `offset`) as SearchBy}
+                        selectedTopics={this.props.match.params.topics}
                         search={this.state.search}>
                     </MultiTopicsInput>
                 ) : (
@@ -223,7 +226,7 @@ export class Messages extends React.Component<Props, State> {
                         url={this.url}
                         search={this.state.search}
                         offset={this.url.Get(`offset`)}
-                        limit={this.url.Get(`limit`)}
+                        limit={this.url.Get(`limit`) ?? 5}
                         fromTime={this.url.Get(`from_time`)}
                         toTime={this.url.Get(`to_time`)}
                         searchBy={(this.url.Get(`search_by`) ?? `offset`) as SearchBy}

@@ -243,42 +243,6 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 	}
 })
 
-app.get("/api/messages-cross-topics/:topics", async (req, res) => {
-	try {
-		req.setTimeout(300000) //5 minutes timeout on the entire request
-
-		const limit = req.query.limit ? parseInt(req.query.limit.toString()) : 100
-		const fromBeginning = req.query.search_from === `Beginning`
-		const search = req.query.search ? req.query.search.toString() : ""
-		let messages: MessageInfo[] = []
-		const topics = req.params.topics.split(`,`)
-		let hasTimeout = false
-		for (const topic of topics) {
-			const partitions = await withRetry("fetchTopicOffsets", () => kafka.Admin.fetchTopicOffsets(topic))
-			for (const partition of partitions) {
-				const low = parseInt(partition.low)
-				const high = parseInt(partition.high)
-				if (high === 0) {
-					continue
-				}
-				const offset = fromBeginning ? low : Math.max(parseInt(partition.high) - limit, low)
-				let partitionLimit = offset + limit > high ? high - offset : limit
-				console.log(`Getting messages for topic ${topic}, partition ${partition.partition}`)
-				const partitionMessages = await getMessages({topic, partition: partition.partition, limit: partitionLimit, offset, search })
-				console.log(`Done getting messages for topic ${topic}, partition ${partition.partition} (#${partitionMessages.messages.length}, timeout = ${partitionMessages.hasTimeout})`)
-				messages = messages.concat(partitionMessages.messages)
-				hasTimeout = hasTimeout || partitionMessages.hasTimeout
-			}
-		}
-		console.log(`Done getting all messages (#${messages.length})`)
-		res.status(200).json({messages, hasTimeout})
-	}
-	catch (error) {
-		console.error(`Error getting all messages: ${error}`)
-		res.status(500).json({ error })
-	}
-})
-
 app.get("/api/schema-registry/subjects", async (req, res) => {
 	try {
 		const subjects = await schemaRegistry.getSubjects()

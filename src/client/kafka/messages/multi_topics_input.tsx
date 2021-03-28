@@ -1,24 +1,23 @@
 import React from "react";
-import TextField from '@material-ui/core/TextField';
 import CircularProgress from '@material-ui/core/CircularProgress';
 import Checkbox from '@material-ui/core/Checkbox';
 import Select from '@material-ui/core/Select';
 import InputLabel from '@material-ui/core/InputLabel';
 import FormControl from '@material-ui/core/FormControl';
-import Toolbar from '@material-ui/core/Toolbar';
 import MenuItem from '@material-ui/core/MenuItem';
 import ListItemText from '@material-ui/core/ListItemText';
-import { GoButton } from './go_button';
-import { AllPartitions } from './single_topic_input';
-import { ErrorMsg} from '../../common/error_msg';
+import { Fetcher, SearchBy, AllPartitions } from './fetcher';
 import { Url } from '../../common/url';
 
 interface Props {
-    url: Url;
-    search: string;
     selectedTopics?: any;
-    searchFrom?: any;
+    offset?: any;
     limit?: any;
+    fromTime?: any;
+    toTime?: any;
+    search: string;
+    searchBy: SearchBy;
+    url: Url;
     onDataFetched: (data: any) => void;
     onDataFetchStarted: (partition: string) => void;
 }
@@ -28,39 +27,19 @@ type State = {
     selectedTopics: string[];
     loadingMessages: boolean;
     loadingTopics: boolean;
-    searchFrom: string;
-    limit: number;
     error: any;
-    isCanceled: boolean;
-    abortController: AbortController | null;
 }
-
 
 export class MultiTopicsInput extends React.Component<Props, State> {
     state: State = {
         topics: [],
-        selectedTopics: [],
-        searchFrom: `End`,
-        limit: 100,
+        selectedTopics: this.props.selectedTopics?.split(`,`) ?? [],
         loadingMessages: false,
         loadingTopics: true,
         error: "",
-        isCanceled: false,
-        abortController: null,
     }
 
     async componentDidMount() {
-        const newState: any = {};
-        if (this.props.selectedTopics !== undefined) {
-            newState.selectedTopics = this.props.selectedTopics.split(`,`)
-        }
-        if (this.props.searchFrom !== undefined) {
-            newState.searchFrom = this.props.searchFrom
-        }
-        if (this.props.limit !== undefined) {
-            newState.limit = this.props.limit
-        }
-        this.setState(newState, this.updateUrl)
         await this.fetchTopics()
     }
 
@@ -75,32 +54,8 @@ export class MultiTopicsInput extends React.Component<Props, State> {
         this.setState({topics, loadingTopics: false})
     }
 
-    fetchMessages = async () => {
-        this.setState({ loadingMessages: true })
-        this.props.onDataFetchStarted(AllPartitions)
-        const topics = this.state.selectedTopics.join(`,`)
-        const response = await fetch(
-            `/api/messages-cross-topics/${topics}?limit=${this.state.limit}&search_from=${this.state.searchFrom}&search=${this.props.search}`,
-            {signal: this.state.abortController?.signal})
-        if (this.state.isCanceled) {
-            this.setState({loadingMessages: false})
-            return
-        }
-        const data = await response.json()
-        if (this.state.isCanceled) {
-            this.setState({loadingMessages: false})
-            return
-        }
-        this.props.onDataFetched(data)
-        this.setState({loadingMessages: false})
-    }
-
     updateUrl = () => {
-        this.props.url.BaseUrl = `/messages-cross-topics`
-        this.props.url.Set(
-            {name: `searchFrom`, val: this.state.searchFrom},
-            {name: `limit`, val: this.state.limit.toString()},
-            {name: `topics`, val: this.state.selectedTopics.join(`,`)})
+        this.props.url.BaseUrl = `/topics/messages/${this.state.selectedTopics.join(`,`)}`
     }
 
     render() {
@@ -113,90 +68,61 @@ export class MultiTopicsInput extends React.Component<Props, State> {
                 <ListItemText primary={topic} />
             </MenuItem>))
 
-        const searchFrom = [`Beginning`, `End`].map((from: string) => (<MenuItem key={from} value={from}>{from}</MenuItem>))
         const allTopicsSelected = this.state.selectedTopics.length === this.state.topics.length
 
         return (
             <>
-            <Toolbar>
-                <div style={{ flex: 1 }}>
+            {!this.state.loadingTopics && ( <Fetcher
+                url={this.props.url}
+                updateUrl={this.updateUrl}
+                onError={(error: string) => this.setState({error})}
+                scope={(
                     <FormControl style={{ margin: 16, minWidth: 120 }}>
-                        <InputLabel htmlFor="topics-select">Topics</InputLabel>
-                        <Select
-                            value={this.state.selectedTopics}
-                            multiple
-                            renderValue={(selected: any) => selected.length > 2 ? `${selected.length} topics` : selected.join(', ')}
-                            onChange={(e: any) => {
-                                let selected = e.target.value
-                                if (selected && selected.includes("SelectAll")) {
-                                    if (allTopicsSelected) {
-                                        selected = []
-                                    } else {
-                                        selected = this.state.topics
-                                    }
+                    <InputLabel htmlFor="topics-select">Topics</InputLabel>
+                    <Select
+                        value={this.state.selectedTopics}
+                        multiple
+                        renderValue={(selected: any) => selected.length > 2 ? `${selected.length} topics` : selected.join(', ')}
+                        onChange={(e: any) => {
+                            let selected = e.target.value
+                            if (selected && selected.includes("SelectAll")) {
+                                if (allTopicsSelected) {
+                                    selected = []
+                                } else {
+                                    selected = this.state.topics
                                 }
-                                this.setState({ selectedTopics: selected }, this.updateUrl)
-                            }}
-                            inputProps={{
-                                name: 'topics',
-                                id: 'topics-select',
-                            }}
-                        >
-                            <MenuItem key={"select all topics"} value="SelectAll">
-                                <Checkbox checked={allTopicsSelected} />
-                                <ListItemText primary={allTopicsSelected ? "Select none" : "Select all"} />
-                            </MenuItem>
-
-                            {topics}
-                        </Select>
-                    </FormControl>
-                    <FormControl style={{ margin: 16, minWidth: 120 }}>
-                        <InputLabel htmlFor="search-from-select">Search From</InputLabel>
-                        <Select
-                                value={this.state.searchFrom}
-                                onChange={(e: any) => this.setState({ searchFrom: e.target.value }, this.updateUrl)}
-                                inputProps={{
-                                    name: 'search-from',
-                                    id: 'search-from-select',
-                                }}
-                            >
-                                {searchFrom}
-                        </Select>
-                    </FormControl>
-                    <TextField
-                        label="Limit"
-                        type="number"
-                        value={this.state.limit}
-                        onChange={(e: any) => this.setState({ limit: parseInt(e.target.value) }, this.updateUrl)}
-                        margin="normal"
-                        style={{ marginRight: 10, maxWidth: 50 }}
-                        inputProps={{ min: "0", step: "1" }}
-                    />
-                    </div>
-                    <GoButton
-                        onRun={() => {
-                            return new Promise((resolve, reject) => {
-                                this.setState({isCanceled: false, abortController: new AbortController()},
-                                async () => {
-                                    try {
-                                        await this.fetchMessages()
-                                        resolve()
-                                    } catch (error) {
-                                        if (error.name === 'AbortError') {
-                                            this.setState({loadingMessages: false})
-                                            resolve()
-                                        } else {
-                                            reject(error)
-                                        }
-                                    }
-                                })
-                            })
+                            }
+                            this.setState({ selectedTopics: selected }, () => { this.updateUrl(); this.props.url.Refresh(); })
                         }}
-                        onCancel={()=>{ this.setState({isCanceled: true }, () => this.state.abortController?.abort())}}
-                        isRunning={this.state.loadingMessages}>
-                    </GoButton>
-            </Toolbar>
-            <ErrorMsg error={this.state.error} prefix="Failed to fetch topics. Error: "></ErrorMsg>
+                        inputProps={{
+                            name: 'topics',
+                            id: 'topics-select',
+                        }}
+                    >
+                        <MenuItem key={"select all topics"} value="SelectAll">
+                            <Checkbox checked={allTopicsSelected} />
+                            <ListItemText primary={allTopicsSelected ? "Select none" : "Select all"} />
+                        </MenuItem>
+
+                        {topics}
+                    </Select>
+                </FormControl>
+            )}
+            topics={this.state.selectedTopics}
+            partition={AllPartitions}
+            limit={this.props.limit}
+            fromTime={this.props.fromTime}
+            toTime={this.props.toTime}
+            search={this.props.search}
+            searchBy={this.props.searchBy}
+            onDataFetched={this.props.onDataFetched}
+            onDataFetchStarted={() => { this.setState({loadingMessages: true}); this.props.onDataFetchStarted} }
+            onDataFetchCompleted={() => this.setState({loadingMessages: false})}
+            loadingMessages={this.state.loadingMessages}
+            error={this.state.error}
+            errorPrefix={"Error while loading messages: "}
+            >
+            </Fetcher>)}
             </>
         )
     }

@@ -163,7 +163,7 @@ export const KafkaToolbar: React.FunctionComponent<Props> = (props) => {
                   <MenuItem>Schema-Registry (subjects)</MenuItem>
                 </Link>
                 <Divider/>
-                <Link href="/messages-cross-topics" color="inherit">
+                <Link href="/topics/messages" color="inherit">
                   <MenuItem><SearchIcon /> Search across topics</MenuItem>
                 </Link>
             </Menu>

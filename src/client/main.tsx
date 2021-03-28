@@ -26,7 +26,8 @@ const App = () => {
 					<Route path="/topic/consumer_groups/:topic" exact component={TopicGroups} />
 					<Route path="/topic/messages/:topic/:partition" component={Messages} />
 					<Route path="/topic/messages/:topic" exact component={Messages} />
-					<Route path="/messages-cross-topics" exact component={Messages} />
+					<Route path="/topics/messages/:topics" exact component={Messages} />
+					<Route path="/topics/messages" exact component={Messages} />
 					<Route path="/brokers" exact component={Brokers} />
 					<Route path="/groups" exact component={Groups} />
 					<Route path="/members/:group" exact component={Members} />
