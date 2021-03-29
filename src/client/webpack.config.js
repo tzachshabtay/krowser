@@ -27,20 +27,22 @@ module.exports = {
 				test: /\.tsx?$/,
 				loader: "ts-loader",
 			},
-
 			// All output '.js' files will have any sourcemaps re-processed by 'source-map-loader'.
 			{ enforce: "pre", test: /\.js$/, loader: "source-map-loader" },
 			{
 				test: /\.css$/,
 				use: [{ loader: "style-loader" }, { loader: "css-loader" }]
 			},
+			{
+				test: /\.m?js/,
+				resolve: {
+					fullySpecified: false
+				}
+			}
 		]
 	},
 
 	optimization: {
-		splitChunks: {
-			chunks: "all"
-		},
 		usedExports: true
 	},
 };
