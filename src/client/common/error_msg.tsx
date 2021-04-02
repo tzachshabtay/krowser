@@ -3,7 +3,7 @@ import Alert from '@material-ui/lab/Alert';
 
 interface ErrorProps {
     prefix?: string
-    error: any
+    error?: string
 }
 
 export const ErrorMsg: React.FunctionComponent<ErrorProps> = (props) => {

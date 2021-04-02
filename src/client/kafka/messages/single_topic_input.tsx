@@ -4,20 +4,21 @@ import Select from '@material-ui/core/Select';
 import InputLabel from '@material-ui/core/InputLabel';
 import FormControl from '@material-ui/core/FormControl';
 import MenuItem from '@material-ui/core/MenuItem';
-import { Fetcher, SearchBy, AllPartitions } from './fetcher';
+import { Fetcher, SearchBy, AllPartitions, FetchData } from './fetcher';
 import { Url } from '../../common/url';
+import { GetTopicOffsetsResult, TopicOffsets } from "../../../shared/api";
 
 interface Props {
     topic: string;
     partition?: string;
-    offset?: any;
-    limit?: any;
-    fromTime?: any;
-    toTime?: any;
+    offset?: number;
+    limit?: number;
+    fromTime?: string;
+    toTime?: string;
     search: string;
     searchBy: SearchBy;
     url: Url;
-    onDataFetched: (data: any) => void;
+    onDataFetched: (data: FetchData) => void;
     onDataFetchStarted: (partition: string) => void;
 }
 
@@ -26,8 +27,14 @@ type State = {
     offset: number;
     loadingMessages: boolean;
     loadingPartitions: boolean;
-    partitions: any[];
-    error: any;
+    partitions: PartitionSelector[];
+    error?: string;
+}
+
+type PartitionSelector = {
+    label: string;
+    value: string;
+    isEmpty: boolean;
 }
 
 export class SingleTopicInput extends React.Component<Props, State> {
@@ -46,41 +53,36 @@ export class SingleTopicInput extends React.Component<Props, State> {
 
     async fetchPartitions() {
         const response = await fetch(`/api/topic/${this.props.topic}/offsets`)
-        const data: any = await response.json()
+        const data: GetTopicOffsetsResult = await response.json()
         if (data.error) {
             this.setState({loadingPartitions: false, error: data.error})
             return
         }
-        const results = data.offsets.map((r: any) => {
+        const results: PartitionSelector[] = data.offsets.map((r: TopicOffsets) => {
             const isEmpty = r.high.toString() === "0"
             const label = isEmpty ?
                 `Partition: ${r.partition} (Empty)` :
                 `Partition: ${r.partition} (Low- ${r.low}, High- ${r.high}, Current- ${r.offset})`;
             return { label: label, value: r.partition.toString(), isEmpty }
         })
-        const newState: any = { loadingPartitions: false, partitions: [{label: `All Partitions`, value: AllPartitions}, ...results] }
-        if (this.props.limit !== undefined) {
-            newState.limit = parseInt(this.props.limit)
-        }
+        const newState: Pick<State, keyof State> = { loadingPartitions: false, partitions: [{label: `All Partitions`, value: AllPartitions, isEmpty: true}, ...results], offset: this.state.offset, partition: this.state.partition, loadingMessages: this.state.loadingMessages }
         if (this.props.partition === undefined) {
-            const nonEmpty = results.find((row: any) => !row.isEmpty)
+            const nonEmpty = results.find(row => !row.isEmpty)
             if (nonEmpty) {
                 newState.partition = nonEmpty.value
             }
         }
         const partitionIndex = newState.partition || this.props.partition
-        if (this.props.fromTime !== undefined) {
-            newState.fromTime = this.props.fromTime
-        }
         const offset = await this.getInitialOffset(partitionIndex, data)
-        newState.offset = offset
-        newState.toTime = this.props.toTime ?? ""
+        if (offset !== undefined) {
+            newState.offset = offset
+        }
         this.setState(newState)
     }
 
-    getInitialOffset = async (partitionIndex: string | undefined, data: any): Promise<number | undefined> => {
+    getInitialOffset = async (partitionIndex: string | undefined, data: GetTopicOffsetsResult): Promise<number | undefined> => {
         if (this.props.offset !== undefined) {
-            return parseInt(this.props.offset)
+            return this.props.offset
         }
         if (partitionIndex === undefined || partitionIndex === AllPartitions) {
             return undefined
@@ -88,7 +90,7 @@ export class SingleTopicInput extends React.Component<Props, State> {
         const partition = data.offsets[parseInt(partitionIndex)]
         const high = parseInt(partition.high)
         const low = parseInt(partition.low)
-        let offset = high - this.props.limit
+        let offset = high - (this.props.limit ?? 5)
         if (offset < low) {
             offset = low
         }
@@ -115,7 +117,7 @@ export class SingleTopicInput extends React.Component<Props, State> {
                         <InputLabel htmlFor="partition-select">Partition</InputLabel>
                         <Select
                             value={this.state.partition}
-                            onChange={(e: any) => this.setState({ partition: e.target.value }, () => { this.updateUrl(); this.props.url.Refresh(); })}
+                            onChange={(e: React.ChangeEvent<{ name?: string; value: unknown }>) => this.setState({ partition: e.target.value as string }, () => { this.updateUrl(); this.props.url.Refresh(); })}
                             inputProps={{
                                 name: 'partition',
                                 id: 'partition-select',
@@ -137,7 +139,7 @@ export class SingleTopicInput extends React.Component<Props, State> {
                 onDataFetchStarted={() => { this.setState({loadingMessages: true}); this.props.onDataFetchStarted} }
                 onDataFetchCompleted={() => this.setState({loadingMessages: false})}
                 loadingMessages={this.state.loadingMessages}
-                error={this.state.error}
+                error={this.state.error ?? ""}
                 errorPrefix={"Error while loading messages: "}
             >
             </Fetcher>)}

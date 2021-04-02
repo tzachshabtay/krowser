@@ -7,12 +7,14 @@ import { CellProps, CellButton } from '../common/cell_button';
 import { GridApi, ColumnApi, GridReadyEvent } from 'ag-grid-community';
 import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
+import { GetSubjectsResult, GetSubjectVersionsResult } from "../../shared/api";
+import { History } from 'history';
 
 type State = {
     search: string;
     loading: boolean;
-    rows: any[];
-    error: any;
+    rows: Subject[];
+    error?: string;
     errorPrefix: string;
 }
 
@@ -20,6 +22,13 @@ class ViewVersionsButton extends React.Component<CellProps, {}> {
     render() {
         return <CellButton getUrl={() => `/schema-registry/versions/${this.props.data.subject}`} {...this.props} />
     }
+}
+
+type Subject = {
+    subject: String,
+    versions?: GetSubjectVersionsResult,
+    num_versions?: number,
+    history: History<unknown>,
 }
 
 export class Subjects extends React.Component<RouteComponentProps, State> {
@@ -40,12 +49,12 @@ export class Subjects extends React.Component<RouteComponentProps, State> {
 
     async componentDidMount() {
         const response = await fetch(`/api/schema-registry/subjects`)
-        const data = await response.json()
+        const data: GetSubjectsResult = await response.json()
         if (data.error) {
             this.setState({ loading: false, error: data.error, errorPrefix: "Failed to fetch subjects. Error: "})
             return
         }
-        const results = data.map((r: any) => (
+        const results = data.map(r => (
             { subject: r, history: this.props.history }))
         const search = this.url.Get(`search`) || ``
         this.setState({ loading: false, rows: results, search })
@@ -54,9 +63,9 @@ export class Subjects extends React.Component<RouteComponentProps, State> {
         }
     }
 
-    async fetchSubject(subject: any) {
+    async fetchSubject(subject: Subject) {
         const response = await fetch(`/api/schema-registry/versions/${subject.subject}`)
-        const data = await response.json()
+        const data: GetSubjectVersionsResult = await response.json()
         if (data.error) {
             this.setState({ loading: false, error: data.error, errorPrefix: `Failed to fetch subject ${subject.subject}. Error: `})
             return

@@ -7,13 +7,16 @@ import { CellProps, CellButton } from '../common/cell_button';
 import { GridApi, ColumnApi, GridReadyEvent } from 'ag-grid-community';
 import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
+import { GetTopicResult, GetTopicsResult, TopicConsumerGroups, TopicOffsets, TopicsOffsets } from "../../shared/api";
+import { DescribeConfigResponse, ITopicMetadata } from "kafkajs";
+import { History } from 'history';
 
 type State = {
     search: string;
     loading: boolean;
-    error: any;
+    error?: string;
     errorPrefix: string;
-    rows: any[];
+    rows: Topic[];
 }
 
 class ViewPartitionsButton extends React.Component<CellProps, {}> {
@@ -40,6 +43,19 @@ class ViewMessagesButton extends React.Component<CellProps, {}> {
     }
 }
 
+type Topic = {
+    topic: string,
+    num_partitions: number,
+    raw: ITopicMetadata,
+    history: History<unknown>,
+    offsets?: TopicsOffsets,
+    config?: DescribeConfigResponse,
+    groups?: TopicConsumerGroups,
+    num_messages?: number,
+    num_groups?: number | `Unknown`,
+    num_configs?: number | `Unknown`,
+}
+
 export class Topics extends React.Component<RouteComponentProps, State> {
     state: State = { search: "", loading: true, rows: [], error: "", errorPrefix: "" }
     gridApi: GridApi | null = null;
@@ -58,12 +74,12 @@ export class Topics extends React.Component<RouteComponentProps, State> {
 
     async componentDidMount() {
         const response = await fetch(`/api/topics`)
-        const data = await response.json()
+        const data: GetTopicsResult = await response.json()
         if (data.error) {
             this.setState({loading: false, error: data.error, errorPrefix: "Failed to fetch topics. Error: "})
             return
         }
-        const results = data.topics.map((r: any) => (
+        const results: Topic[] = data.topics.map((r: ITopicMetadata) => (
             { topic: r.name, num_partitions: r.partitions.length, raw: r, history: this.props.history }))
         const search = this.url.Get(`search`) || ``
         this.setState({ loading: false, rows: results, search })
@@ -72,9 +88,9 @@ export class Topics extends React.Component<RouteComponentProps, State> {
         }
     }
 
-    async fetchTopic(topic: any) {
+    async fetchTopic(topic: Topic) {
         const response = await fetch(`/api/topic/${topic.topic}`)
-        const data = await response.json()
+        const data: GetTopicResult = await response.json()
         if (data.error) {
             this.setState({loading: false, error: data.error, errorPrefix: `Failed to fetch topic ${topic.topic}. Error: `})
             return

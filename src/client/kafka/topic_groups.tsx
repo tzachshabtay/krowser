@@ -8,13 +8,14 @@ import { RouteComponentProps } from "react-router-dom";
 import Box from '@material-ui/core/Box';
 import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
+import { GetTopicConsumerGroupsResult } from "../../shared/api";
 
 type State = {
     search: string;
     loading: boolean;
-    error: any;
-    rows: any[];
-    data: any;
+    error?: string;
+    rows: Group[];
+    data: GetTopicConsumerGroupsResult;
 }
 
 class ProgressRenderer extends React.Component<CellProps, {}> {
@@ -38,8 +39,17 @@ class ProgressRenderer extends React.Component<CellProps, {}> {
     }
 }
 
+type Group = {
+    name: string,
+    partition: number,
+    offset: number,
+    high: number,
+    low: number,
+    lag: number,
+}
+
 export class TopicGroups extends React.Component<RouteComponentProps<{ topic: string }>, State> {
-    state: State = { search: "", loading: true, rows: [], data: {}, error: "" }
+    state: State = { search: "", loading: true, rows: [], data: [], error: "" }
     url: Url;
 
     constructor(props: RouteComponentProps<{ topic: string }>) {
@@ -49,15 +59,15 @@ export class TopicGroups extends React.Component<RouteComponentProps<{ topic: st
 
     async componentDidMount() {
         const response = await fetch(`/api/topic/${this.props.match.params.topic}/consumer_groups`)
-        const data = await response.json()
+        const data: GetTopicConsumerGroupsResult = await response.json()
         if (data.error) {
             this.setState({loading: false, error: data.error })
             return
         }
-        const results: any[] = []
+        const results: Group[] = []
         for (const group of data) {
             for (const partition of group.offsets) {
-                const high = parseInt(partition.partitionOffsets.high)
+                const high = parseInt(partition.partitionOffsets?.high ?? "-1")
                 const offset = parseInt(partition.offset)
                 let lag = high - offset
                 if (offset === -1) {
@@ -68,7 +78,7 @@ export class TopicGroups extends React.Component<RouteComponentProps<{ topic: st
                     partition: partition.partition,
                     offset,
                     high,
-                    low: parseInt(partition.partitionOffsets.low),
+                    low: parseInt(partition.partitionOffsets?.low ?? "-1"),
                     lag,
                 })
             }

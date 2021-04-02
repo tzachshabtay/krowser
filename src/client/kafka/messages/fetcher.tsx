@@ -12,6 +12,7 @@ import { ErrorMsg} from '../../common/error_msg';
 import { Url } from '../../common/url';
 import Box from '@material-ui/core/Box';
 import Typography from '@material-ui/core/Typography';
+import { GetTopicMessagesResult, GetTopicOffsetsByTimestapResult, GetTopicOffsetsResult, TopicOffsets } from "../../../shared/api";
 
 export type SearchBy = "offset" | "time" | "newest" | "oldest";
 
@@ -33,13 +34,13 @@ interface Props {
     scope: React.ReactNode;
     topics: string[];
     partition: string;
-    offset?: any;
-    limit?: any;
-    fromTime?: any;
-    toTime?: any;
+    offset?: number;
+    limit?: number;
+    fromTime?: string;
+    toTime?: string;
     search: string;
     searchBy: SearchBy;
-    onDataFetched: (data: any) => void;
+    onDataFetched: (data: FetchData) => void;
     onDataFetchStarted: (partition: string) => void;
     onDataFetchCompleted: () => void;
     loadingMessages: boolean;
@@ -57,6 +58,8 @@ type State = {
     isCanceled: boolean;
     abortController: AbortController | null;
 }
+
+export type FetchData = GetTopicMessagesResult | null;
 
 interface InputProps{
     label: string;
@@ -135,13 +138,12 @@ export class Fetcher extends React.Component<Props, State> {
     getOffsetForTime = async (topic: string, partition: number, time: string): Promise<number | undefined> => {
         const millis = new Date(time).getTime();
         const response = await fetch(`/api/offsets/${topic}/${millis}`)
-        const data: any = await response.json()
+        const data: GetTopicOffsetsByTimestapResult = await response.json()
         if (data.error) {
             this.props.onError(data.error)
             return undefined
         }
         const result = parseInt(data.find((item: { partition: number; }) => item.partition === partition)?.offset ?? "0")
-        console.log(result)
         return result
     }
 
@@ -149,25 +151,25 @@ export class Fetcher extends React.Component<Props, State> {
         await this.fetchMessages(20000)
     }
 
-    getSelectedPartitions = async(topic: string): Promise<string[]> => {
+    getSelectedPartitions = async(topic: string): Promise<number[]> => {
         if (this.props.partition !== AllPartitions) {
-            return [this.props.partition]
+            return [parseInt(this.props.partition)]
         }
         return await this.getAllPartitionsForTopic(topic)
     }
 
-    getAllPartitionsForTopic = async(topic: string): Promise<string[]> => {
+    getAllPartitionsForTopic = async(topic: string): Promise<number[]> => {
         const response = await fetch(`/api/topic/${topic}/offsets`)
-        const data: any = await response.json()
+        const data: GetTopicOffsetsResult = await response.json()
         if (data.error) {
             this.props.onError(data.error)
             return []
         }
-        return data.offsets.map((r: any) => r.partition)
+        return data.offsets.map((r: TopicOffsets) => r.partition)
     }
 
     fetchOldest = async (timeout: number) => {
-        let out: any = null
+        let out: FetchData = null
         for (const topic of this.props.topics) {
             const partitions = await this.getSelectedPartitions(topic)
             for (const partition of partitions) {
@@ -182,7 +184,7 @@ export class Fetcher extends React.Component<Props, State> {
     }
 
     fetchNewest = async (timeout: number) => {
-        let out: any = null
+        let out: FetchData = null
         for (const topic of this.props.topics) {
             const partitions = await this.getSelectedPartitions(topic)
             for (const partition of partitions) {
@@ -196,26 +198,26 @@ export class Fetcher extends React.Component<Props, State> {
         }
     }
 
-    getPartitionOffsets = async (topic: string, partition: string) => {
+    getPartitionOffsets = async (topic: string, partition: number) => {
         const response = await fetch(`/api/topic/${topic}/offsets`)
-        const data: any = await response.json()
+        const data: GetTopicOffsetsResult = await response.json()
         if (data.error) {
             this.props.onError(data.error)
             return undefined
         }
-        return data.offsets.find((el: any) => el.partition.toString() === partition.toString())
+        return data.offsets.find((el: TopicOffsets) => el.partition === partition)
     }
 
     fetchByTime = async (timeout: number) => {
-        let out: any = null
+        let out: FetchData = null
         for (const topic of this.props.topics) {
             const partitions = await this.getSelectedPartitions(topic)
             for (const partition of partitions) {
-                const fromOffset = await this.getOffsetForTime(topic, parseInt(partition), this.state.fromTime)
+                const fromOffset = await this.getOffsetForTime(topic, partition, this.state.fromTime)
                 if (fromOffset === undefined) {
                     return
                 }
-                const toOffset = await this.getOffsetForTime(topic, parseInt(partition), this.state.toTime)
+                const toOffset = await this.getOffsetForTime(topic, partition, this.state.toTime)
                 if (toOffset === undefined) {
                     return
                 }
@@ -227,7 +229,7 @@ export class Fetcher extends React.Component<Props, State> {
     }
 
     fetchByOffsets = async (timeout: number) => {
-        let out: any = null
+        let out: FetchData = null
         for (const topic of this.props.topics) {
             const partitions = await this.getSelectedPartitions(topic)
             for (const partition of partitions) {
@@ -270,7 +272,7 @@ export class Fetcher extends React.Component<Props, State> {
         }
     }
 
-    fetchMessagesForPartition = async (topic: string, timeout: number, partition: string, out: any): Promise<any> => {
+    fetchMessagesForPartition = async (topic: string, timeout: number, partition: number, out: FetchData): Promise<FetchData> => {
         let cursor = this.state.offset
         if (cursor === undefined) {
             return null
@@ -281,7 +283,7 @@ export class Fetcher extends React.Component<Props, State> {
             limit = 1000
         }
         if (cursor >= max) {
-            this.props.onDataFetched({messages: out ?? []})
+            this.props.onDataFetched(out)
         }
         const min = cursor
         while (cursor < max) {
@@ -305,7 +307,7 @@ export class Fetcher extends React.Component<Props, State> {
                 break
             }
             cursor += limit
-            const data = await response.json()
+            const data: GetTopicMessagesResult = await response.json()
             if (this.state.isCanceled) {
                 break
             }
@@ -357,7 +359,7 @@ export class Fetcher extends React.Component<Props, State> {
                     <InputLabel htmlFor="search-by-select">Search By</InputLabel>
                     <Select
                         value={this.state.searchBy}
-                        onChange={(e: any) => this.setState({ searchBy: e.target.value }, this.updateUrl)}
+                        onChange={(e: React.ChangeEvent<{ name?: string; value: unknown }>) => this.setState({ searchBy: e.target.value as SearchBy }, this.updateUrl)}
                         inputProps={{
                             name: 'searchBy',
                             id: 'search-by-select',
@@ -373,14 +375,14 @@ export class Fetcher extends React.Component<Props, State> {
                 <InputField
                     label="Offset"
                     value={this.state.offset}
-                    onChange={(e: any) => this.setState({ offset: parseInt(e.target.value) }, this.updateUrl)}
+                    onChange={(e: React.ChangeEvent<{ name?: string; value: unknown }>) => this.setState({ offset: parseInt(e.target.value as string) }, this.updateUrl)}
                     onEnter={async () => { await this.onFetchMessagesClicked() }}
                 />}
                 {this.state.searchBy !== "time" &&
                 <InputField
                     label="Limit"
                     value={this.state.limit}
-                    onChange={(e: any) => this.setState({ limit: parseInt(e.target.value) }, this.updateUrl)}
+                    onChange={(e: React.ChangeEvent<{ name?: string; value: unknown }>) => this.setState({ limit: parseInt(e.target.value as string) }, this.updateUrl)}
                     onEnter={async () => { await this.onFetchMessagesClicked() }}
                 />}
                 {this.state.searchBy === "time" &&
@@ -388,13 +390,13 @@ export class Fetcher extends React.Component<Props, State> {
                 <DateTimeField
                     label="From"
                     value={this.state.fromTime}
-                    onChange={(e: any) => this.setState({ fromTime: e.target.value }, this.updateUrl)}
+                    onChange={(e: React.ChangeEvent<{ name?: string; value: unknown }>) => this.setState({ fromTime: e.target.value as string }, this.updateUrl)}
                     onEnter={async () => { await this.onFetchMessagesClicked() }}
                 ></DateTimeField>
                 <DateTimeField
                     label="To"
                     value={this.state.toTime}
-                    onChange={(e: any) => this.setState({ toTime: e.target.value }, this.updateUrl)}
+                    onChange={(e: React.ChangeEvent<{ name?: string; value: unknown }>) => this.setState({ toTime: e.target.value as string }, this.updateUrl)}
                     onEnter={async () => { await this.onFetchMessagesClicked() }}
                 ></DateTimeField>
                 </>}
