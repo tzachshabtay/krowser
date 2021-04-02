@@ -6,19 +6,20 @@ import InputLabel from '@material-ui/core/InputLabel';
 import FormControl from '@material-ui/core/FormControl';
 import MenuItem from '@material-ui/core/MenuItem';
 import ListItemText from '@material-ui/core/ListItemText';
-import { Fetcher, SearchBy, AllPartitions } from './fetcher';
+import { Fetcher, SearchBy, AllPartitions, FetchData } from './fetcher';
 import { Url } from '../../common/url';
+import { GetTopicsResult } from "../../../shared/api";
+import { ITopicMetadata } from "kafkajs";
 
 interface Props {
-    selectedTopics?: any;
-    offset?: any;
-    limit?: any;
-    fromTime?: any;
-    toTime?: any;
+    selectedTopics?: string;
+    limit?: number;
+    fromTime?: string;
+    toTime?: string;
     search: string;
     searchBy: SearchBy;
     url: Url;
-    onDataFetched: (data: any) => void;
+    onDataFetched: (data: FetchData) => void;
     onDataFetchStarted: (partition: string) => void;
 }
 
@@ -27,7 +28,7 @@ type State = {
     selectedTopics: string[];
     loadingMessages: boolean;
     loadingTopics: boolean;
-    error: any;
+    error?: string;
 }
 
 export class MultiTopicsInput extends React.Component<Props, State> {
@@ -45,12 +46,12 @@ export class MultiTopicsInput extends React.Component<Props, State> {
 
     async fetchTopics() {
         const response = await fetch(`/api/topics`)
-        const data = await response.json()
+        const data: GetTopicsResult = await response.json()
         if (data.error) {
             this.setState({loadingTopics: false, error: data.error })
             return
         }
-        const topics = data.topics.map((r: any) => r.name)
+        const topics = data.topics.map((r: ITopicMetadata) => r.name)
         this.setState({topics, loadingTopics: false})
     }
 
@@ -83,8 +84,8 @@ export class MultiTopicsInput extends React.Component<Props, State> {
                         value={this.state.selectedTopics}
                         multiple
                         renderValue={(selected: any) => selected.length > 2 ? `${selected.length} topics` : selected.join(', ')}
-                        onChange={(e: any) => {
-                            let selected = e.target.value
+                        onChange={(e: React.ChangeEvent<{ name?: string; value: unknown }>) => {
+                            let selected = e.target.value as string[]
                             if (selected && selected.includes("SelectAll")) {
                                 if (allTopicsSelected) {
                                     selected = []
@@ -119,7 +120,7 @@ export class MultiTopicsInput extends React.Component<Props, State> {
             onDataFetchStarted={() => { this.setState({loadingMessages: true}); this.props.onDataFetchStarted} }
             onDataFetchCompleted={() => this.setState({loadingMessages: false})}
             loadingMessages={this.state.loadingMessages}
-            error={this.state.error}
+            error={this.state.error ?? ""}
             errorPrefix={"Error while loading messages: "}
             >
             </Fetcher>)}

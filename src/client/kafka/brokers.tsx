@@ -5,17 +5,17 @@ import { KafkaToolbar} from '../common/toolbar';
 import { DataView} from '../common/data_view';
 import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
+import { Broker, GetClusterResult } from "../../shared/api";
 
 type State = {
     search: string;
     loading: boolean;
-    error: any;
-    rows: any[];
-    data: any;
+    error?: string;
+    rows: Broker[];
 }
 
 export class Brokers extends React.Component<RouteComponentProps, State> {
-    state: State = { loading: true, rows: [], data: {}, search: "", error: "" }
+    state: State = { loading: true, rows: [], search: "", error: "" }
     url: Url;
 
     constructor(props: RouteComponentProps) {
@@ -25,14 +25,14 @@ export class Brokers extends React.Component<RouteComponentProps, State> {
 
     async componentDidMount() {
         const response = await fetch(`/api/cluster`)
-        const data = await response.json()
+        const data: GetClusterResult = await response.json()
         if (data.error) {
             this.setState({loading: false, error: data.error})
             return
         }
         const rows = data.brokers
         const search = this.url.Get(`search`) || ``
-        this.setState({ loading: false, rows, data, search })
+        this.setState({ loading: false, rows, search })
     }
 
     getColumnDefs() {
@@ -58,7 +58,7 @@ export class Brokers extends React.Component<RouteComponentProps, State> {
                     searchQuery={this.state.search}
                     search={r => r.host.includes(this.state.search)}
                     rows={this.state.rows}
-                    raw={this.state.data}
+                    raw={this.state.rows}
                     url={this.url}
                     columnDefs={this.getColumnDefs()}>
                 </DataView>}

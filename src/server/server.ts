@@ -1,15 +1,12 @@
 import express from "express";
 import http from "http";
 import path from "path";
-import { Kafka, KafkaMessage, ResourceTypes, DescribeConfigResponse, Consumer, Admin } from "kafkajs";
+import { Kafka, ResourceTypes, DescribeConfigResponse, Consumer, Admin, GroupDescriptions } from "kafkajs";
 import { SchemaRegistry } from '@ovotech/avro-kafkajs';
 import { Type } from "avsc";
 import { v4 as uuidv4 } from 'uuid';
 import { KAFKA_URLS, SCHEMA_REGISTRY_URL } from "./config";
-
-type MessageInfo = { topic: string, partition: number, value: string, key: string, message: KafkaMessage, schemaType: Type | undefined }
-
-type MessagesResult = { messages: MessageInfo[], hasTimeout: boolean }
+import { GetTopicsResult, GetTopicResult, TopicsOffsets, ConsumerOffsets, TopicConsumerGroups, TopicOffsets, GetClusterResult, GetTopicOffsetsByTimestapResult, TopicMessage, TopicMessages, GetTopicMessagesResult, GetSubjectsResult, GetSubjectVersionsResult, GetSchemaResult, GetTopicConsumerGroupsResult, GetTopicOffsetsResult } from "../shared/api";
 
 type TopicQueryInput = { topic: string, partition: number, limit: number, offset: number, search: string, timeout?: number}
 
@@ -65,7 +62,7 @@ async function withRetry<TRes>(name: string, fun: () => Promise<TRes>): Promise<
 
 app.get("/api/topics", async (req, res) => {
 	try {
-		const topics = await withRetry("fetchTopicMetadata", () => kafka.Admin.fetchTopicMetadata(undefined as any))
+		const topics: GetTopicsResult = await withRetry("fetchTopicMetadata", () => kafka.Admin.fetchTopicMetadata(undefined as any))
 		res.status(200).json(topics)
 	}
 	catch (error) {
@@ -75,22 +72,22 @@ app.get("/api/topics", async (req, res) => {
 
 app.get("/api/topic/:topic", async (req, res) => {
 	try {
-		const offsets = await withRetry("fetchTopicOffsets", () => kafka.Admin.fetchTopicOffsets(req.params.topic))
+		const offsets: TopicsOffsets = await withRetry("fetchTopicOffsets", () => kafka.Admin.fetchTopicOffsets(req.params.topic))
 		offsets.sort((o1, o2) => o1.partition - o2.partition)
 		try {
 			const groups = await getTopicConsumerGroups(req.params.topic)
 			try {
-				const config = await getTopicConfig(req.params.topic)
-				res.status(200).json({offsets, groups, config})
+				const config: DescribeConfigResponse = await getTopicConfig(req.params.topic)
+				res.status(200).json({offsets, groups, config} as GetTopicResult)
 			}
 			catch (error) {
 				console.error(`Error while fetching config for topic ${req.params.topic}:`, error)
-				res.status(200).json({offsets, groups})
+				res.status(200).json({offsets, groups} as GetTopicResult)
 			}
 		}
 		catch (error) {
 			console.error(`Error while fetching consumer groups for topic ${req.params.topic}:`, error)
-			res.status(200).json({offsets})
+			res.status(200).json({offsets} as GetTopicResult)
 		}
 	}
 	catch (error) {
@@ -102,7 +99,8 @@ app.get("/api/topic/:topic/offsets", async (req, res) => {
 	try {
 		const offsets = await withRetry("fetchTopicOffsets", () => kafka.Admin.fetchTopicOffsets(req.params.topic))
 		offsets.sort((o1, o2) => o1.partition - o2.partition)
-		res.status(200).json({offsets})
+		const out: GetTopicOffsetsResult = {offsets}
+		res.status(200).json(out)
 	}
 	catch (error) {
 		res.status(500).json({ error })
@@ -121,9 +119,9 @@ app.get("/api/topic/:topic/config", async (req, res) => {
 
 app.get("/api/topic/:topic/consumer_groups", async (req, res) => {
 	try {
-		const groups = await getTopicConsumerGroups(req.params.topic)
+		const groups: GetTopicConsumerGroupsResult = await getTopicConsumerGroups(req.params.topic)
 		const offsets = await withRetry("fetchTopicOffsets", () => kafka.Admin.fetchTopicOffsets(req.params.topic))
-		const partitonToOffset: Record<number, any> = {}
+		const partitonToOffset: Record<number, TopicOffsets> = {}
 		for (const offset of offsets) {
 			partitonToOffset[offset.partition] = offset
 		}
@@ -155,7 +153,7 @@ app.get("/api/groups", async (req, res) => {
 
 app.get("/api/members/:group", async (req, res) => {
 	try {
-		const groups = await withRetry("describeGroups", () => kafka.Admin.describeGroups([req.params.group])) as any //https://github.com/tulios/kafkajs/issues/756
+		const groups = await withRetry("describeGroups", () => kafka.Admin.describeGroups([req.params.group]))
 		modifyGroups(groups)
 		res.status(200).json(groups.groups[0].members)
 	}
@@ -164,9 +162,9 @@ app.get("/api/members/:group", async (req, res) => {
 	}
 })
 
-//todo: remove this when https://github.com/tulios/kafkajs/issues/755 is resolved
-function modifyGroups(groups: any) {
-	for (const group of (groups as any).groups) { //https://github.com/tulios/kafkajs/issues/756
+//todo: remove this when https://github.com/tulios/kafkajs/issues/755 is resolved (and add types)
+function modifyGroups(groups: GroupDescriptions) {
+	for (const group of (groups as any).groups) {
 		for (const member of group.members) {
 			member.memberAssignment = stringFromArray(member.memberAssignment)
 			member.memberMetadata = stringFromArray(member.memberMetadata)
@@ -187,7 +185,7 @@ function stringFromArray(data: Buffer): string
 
 app.get("/api/cluster", async (req, res) => {
 	try {
-		const cluster = await withRetry("describeCluster", () => kafka.Admin.describeCluster())
+		const cluster: GetClusterResult = await withRetry("describeCluster", () => kafka.Admin.describeCluster())
 		res.status(200).json(cluster)
 	}
 	catch (error) {
@@ -199,7 +197,7 @@ app.get("/api/offsets/:topic/:timestamp", async (req, res) => {
 	try {
 		const topic = req.params.topic
 		const timestamp = req.params.timestamp ? parseInt(req.params.timestamp.toString()) : 0
-		const entries = await withRetry("fetchTopicOffsetsByTimestamp", () => kafka.Admin.fetchTopicOffsetsByTimestamp(topic, timestamp))
+		const entries: GetTopicOffsetsByTimestapResult = await withRetry("fetchTopicOffsetsByTimestamp", () => kafka.Admin.fetchTopicOffsetsByTimestamp(topic, timestamp))
 		res.status(200).json(entries)
 	}
 	catch (error) {
@@ -232,11 +230,11 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 				res.status(200).json({messages: []})
 				return
 			}
-			const messages = await getMessages({topic, partition, limit, offset, search, timeout})
+			const messages: GetTopicMessagesResult = await getMessages({topic, partition, limit, offset, search, timeout})
 			res.status(200).json(messages)
 			return
 		}
-		res.status(404).json(`partition ${partition} not found for topic ${topic}`)
+		res.status(404).json({ error: `partition ${partition} not found for topic ${topic}`})
 	}
 	catch (error) {
 		res.status(500).json({ error })
@@ -245,7 +243,7 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 
 app.get("/api/schema-registry/subjects", async (req, res) => {
 	try {
-		const subjects = await schemaRegistry.getSubjects()
+		const subjects: GetSubjectsResult = await schemaRegistry.getSubjects()
 		res.status(200).json(subjects)
 	}
 	catch (error) {
@@ -255,7 +253,7 @@ app.get("/api/schema-registry/subjects", async (req, res) => {
 
 app.get("/api/schema-registry/versions/:subject", async (req, res) => {
 	try {
-		const versions = await schemaRegistry.getSubjectVersions(req.params.subject)
+		const versions: GetSubjectVersionsResult = await schemaRegistry.getSubjectVersions(req.params.subject)
 		res.status(200).json(versions)
 	}
 	catch (error) {
@@ -265,7 +263,7 @@ app.get("/api/schema-registry/versions/:subject", async (req, res) => {
 
 app.get("/api/schema-registry/schema/:subject/:version", async (req, res) => {
 	try {
-		const schema = await schemaRegistry.getSubjectVersionSchema(req.params.subject, parseInt(req.params.version))
+		const schema: GetSchemaResult = await schemaRegistry.getSubjectVersionSchema(req.params.subject, parseInt(req.params.version))
 		res.status(200).json(schema)
 	}
 	catch (error) {
@@ -289,16 +287,16 @@ const getTopicConfig = async (topic: string): Promise<DescribeConfigResponse> =>
 	}))
 }
 
-const getTopicConsumerGroups = async (topic: string): Promise<any[]> => {
+const getTopicConsumerGroups = async (topic: string): Promise<TopicConsumerGroups> => {
 	const consumers = await withRetry("listGroups", () => kafka.Admin.listGroups())
 	const ids = consumers.groups.filter(c => c.protocolType === `consumer`).map(g => g.groupId)
 	const groups = await withRetry("describeGroups", () => kafka.Admin.describeGroups(ids))
 	modifyGroups(groups)
-	let found = []
-	for (const group of (groups as any).groups) { //https://github.com/tulios/kafkajs/issues/756
+	let found: TopicConsumerGroups = []
+	for (const group of groups.groups) {
 		for (const member of group.members) {
 			if (member.memberAssignment.includes(`${topic}\u0000`)) { //todo: we use suffix delimiter \u0000 but the prefix delimiter looks different each time?
-				const offsets = await withRetry("fetchOffsets", () => kafka.Admin.fetchOffsets({groupId: group.groupId, topic: topic}))
+				const offsets: ConsumerOffsets = await withRetry("fetchOffsets", () => kafka.Admin.fetchOffsets({groupId: group.groupId, topic: topic}))
 				found.push({groupId: group.groupId, offsets})
 			}
 		}
@@ -306,12 +304,12 @@ const getTopicConsumerGroups = async (topic: string): Promise<any[]> => {
 	return found
 }
 
-const getMessages = async (input: TopicQueryInput): Promise<MessagesResult> => {
+const getMessages = async (input: TopicQueryInput): Promise<TopicMessages> => {
 	const groupId = `krowser-${Date.now()}=${uuidv4()}`
 	const consumer = kafka.Kafka.consumer({ groupId })
 	await consumer.connect()
 
-	const messages: MessageInfo[] = []
+	const messages: TopicMessage[] = []
 	let numConsumed = 0
 	console.log(`Querying topic ${input.topic} (partition ${input.partition}) at offset=${input.offset}, limit=${input.limit}`)
 	consumer.subscribe({ topic: input.topic, fromBeginning: true })

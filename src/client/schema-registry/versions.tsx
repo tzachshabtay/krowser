@@ -6,6 +6,8 @@ import { RouteComponentProps } from "react-router-dom";
 import { GridApi, ColumnApi, GridReadyEvent } from 'ag-grid-community';
 import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
+import { GetSchemaResult, GetSubjectVersionsResult } from "../../shared/api";
+import { Schema } from "avsc";
 
 
 type State = {
@@ -13,8 +15,40 @@ type State = {
     loading: boolean;
     rows: any[];
     customCols: {cols: {}};
-    error: any;
+    error?: string;
     errorPrefix: string;
+}
+
+interface Field {
+    name: string;
+    doc?: string;
+    type: Schema;
+    default?: any;
+    order?: "ascending" | "descending" | "ignore";
+}
+
+interface RecordType {
+    type: "record" | "error";
+    name: string;
+    namespace?: string;
+    doc?: string;
+    aliases?: string[];
+    fields: Field[];
+}
+
+type Version = {
+    version: number,
+    schema?: GetSchemaResult,
+    [key: string]: any,
+}
+
+interface EnumType {
+    type: "enum";
+    name: string;
+    namespace?: string;
+    aliases?: string[];
+    doc?: string;
+    symbols: string[];
 }
 
 export class Versions extends React.Component<RouteComponentProps<{ subject: string }>, State> {
@@ -35,12 +69,12 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
 
     async componentDidMount() {
         const response = await fetch(`/api/schema-registry/versions/${this.props.match.params.subject}`)
-        const data = await response.json()
+        const data: GetSubjectVersionsResult = await response.json()
         if (data.error) {
             this.setState({loading: false, error: data.error, errorPrefix: "Failed to fetch versions. Error: "})
             return
         }
-        const results = data.map((r: any) => (
+        const results = data.map(r => (
             { version: r }))
         const search = this.url.Get(`search`) || ``
         this.setState({ loading: false, rows: results, search })
@@ -51,26 +85,30 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
         this.setState({customCols})
     }
 
-    async fetchSchema(version: any, customCols: {cols: any}) {
+    async fetchSchema(version: Version, customCols: {cols: any}) {
         const response = await fetch(`/api/schema-registry/schema/${this.props.match.params.subject}/${version.version}`)
-        const data = await response.json()
+        const data: GetSchemaResult = await response.json()
         if (data.error) {
             this.setState({loading: false, error: data.error, errorPrefix: `Failed to fetch schema for version ${version.version}. Error: `})
             return
         }
         version.schema = data
-        this.addToRow(version, data, customCols, "")
+        this.addToRow(version, data as RecordType, customCols, "")
         if (this.gridApi) {
             this.gridApi.refreshCells()
         }
         this.forceUpdate();
     }
 
-    addToRow = (row: any, data: any, customCols: {cols: any}, prefix: string): any => {
-        for (const field of data.fields) {
+    addToRow = (row: Version, record: RecordType, customCols: {cols: any}, prefix: string) => {
+        if (record.fields === undefined) {
+            return
+        }
+        for (const field of record.fields) {
             const name = `${prefix}${field.name}`
-            if (typeof field.type === "object" && field.type.type === "record") {
-                this.addToRow(row, field.type, customCols, `${name}->`)
+            const innerRecord = field.type as RecordType
+            if (typeof innerRecord === "object" && innerRecord.type === "record") {
+                this.addToRow(row, innerRecord, customCols, `${name}->`)
                 continue
             }
             row[name] = this.getFieldValue(field)
@@ -78,13 +116,14 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
         }
     }
 
-    getFieldValue(field: any) {
+    getFieldValue(field: Field): string {
         if (typeof field.type === "string") {
             return field.type
         }
-        if (field.type.type === "enum") {
-            const symbols = field.type.symbols.join(`, `)
-            return `${field.type.name} (${symbols})`
+        const enumType = field.type as EnumType
+        if (enumType.type === "enum") {
+            const symbols = enumType.symbols.join(`, `)
+            return `${enumType.name} (${symbols})`
         }
         if (Array.isArray(field.type)) {
             const union = field.type.join(`, `)

@@ -1,10 +1,11 @@
 {
+  "include": ["**/*", "../shared/**/*"],
   "compilerOptions": {
     "target": "ES2018",
     "module": "commonjs",
     "sourceMap": true,
-    "outDir": "../../dist/server",
-    "rootDir": "./",
+    "outDir": "../../dist",
+    "rootDir": "../",
     "strict": true,
     "esModuleInterop": true
   }

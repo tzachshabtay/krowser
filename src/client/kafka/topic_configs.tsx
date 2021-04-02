@@ -6,13 +6,15 @@ import { RouteComponentProps } from "react-router-dom";
 import Link from '@material-ui/core/Link';
 import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
+import { GetTopicConfigsResult } from "../../shared/api";
+import { ConfigEntries } from "kafkajs";
 
 type State = {
     search: string;
     loading: boolean;
-    error: any;
-    rows: any[];
-    data: any;
+    error?: string;
+    rows: ConfigEntries[];
+    data?: GetTopicConfigsResult;
 }
 
 export interface TopicConfigLinkProps {
@@ -27,7 +29,7 @@ const TopicConfigLink: React.FunctionComponent<TopicConfigLinkProps> = (props) =
 }
 
 export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: string }>, State> {
-    state: State = { search: "", loading: true, rows: [], data: {}, error: "" }
+    state: State = { search: "", loading: true, rows: [], data: undefined, error: "" }
     url: Url;
 
     constructor(props: RouteComponentProps<{ topic: string }>) {
@@ -37,7 +39,7 @@ export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: s
 
     async componentDidMount() {
         const response = await fetch(`/api/topic/${this.props.match.params.topic}/config`)
-        const data = await response.json()
+        const data: GetTopicConfigsResult = await response.json()
         if (data.error) {
             this.setState({loading: false, error: data.error })
             return
@@ -73,7 +75,7 @@ export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: s
                     searchQuery={this.state.search}
                     search={r => r.configName.includes(this.state.search)}
                     rows={this.state.rows}
-                    raw={this.state.data}
+                    raw={this.state.data?.resources ?? []}
                     url={this.url}
                     columnDefs={this.getColumnDefs()}>
                 </DataView>}

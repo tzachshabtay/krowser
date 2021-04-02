@@ -4,11 +4,12 @@ import { KafkaToolbar} from '../../common/toolbar';
 import { DataView} from '../../common/data_view';
 import { ErrorMsg} from '../../common/error_msg';
 import { SingleTopicInput} from './single_topic_input';
-import { SearchBy, AllPartitions} from './fetcher';
+import { SearchBy, AllPartitions, FetchData} from './fetcher';
 import { MultiTopicsInput} from './multi_topics_input';
 import Alert from '@material-ui/lab/Alert';
-import { GridReadyEvent, GridApi, ColumnApi, FilterChangedEvent } from 'ag-grid-community';
+import { GridReadyEvent, GridApi, ColumnApi, FilterChangedEvent, ColDef, ValueFormatterParams } from 'ag-grid-community';
 import { Url } from "../../common/url";
+import { TopicMessage } from "../../../shared/api";
 
 interface Props extends RouteComponentProps<{ topic?: string, partition?: string, topics?: string }> {
 }
@@ -16,7 +17,7 @@ interface Props extends RouteComponentProps<{ topic?: string, partition?: string
 type State = {
     search: string;
     rows: any[];
-    error: any;
+    error?: string;
     warning: string;
     customCols: {cols: {}};
     partition?: string;
@@ -47,7 +48,7 @@ export class Messages extends React.Component<Props, State> {
         }
     }
 
-    getRow = (data: any, customCols: {cols: {}}): any => {
+    getRow = (data: TopicMessage, customCols: {cols: {}}): any => {
         let row: any = {
             rowTimestamp: data.message.timestamp,
             rowOffset: parseInt(data.message.offset),
@@ -58,7 +59,7 @@ export class Messages extends React.Component<Props, State> {
             rowPartition: data.partition,
         }
         let cols = {}
-        let rowValue = data.value
+        let rowValue: any = data.value
         try {
             cols = JSON.parse(data.value)
             rowValue = cols
@@ -109,8 +110,8 @@ export class Messages extends React.Component<Props, State> {
         }
     }
 
-    getColumnDefs = () => {
-        const cols: any[] = [
+    getColumnDefs = (): ColDef[] => {
+        const cols: ColDef[] = [
             { headerName: "Timestamp", field: "rowTimestamp", valueFormatter: this.timeFormatter },
             { headerName: "Offset", field: "rowOffset", filter: "agNumberColumnFilter" },
             { headerName: "Type", field: "rowType" }
@@ -127,7 +128,7 @@ export class Messages extends React.Component<Props, State> {
         return cols
     }
 
-    addCustomColumns = (cols: any[], fields: any, prefix: string) => {
+    addCustomColumns = (cols: ColDef[], fields: any, prefix: string) => {
         for (const prop in fields) {
             const val: any = fields[prop]
             if (typeof val === 'object') {
@@ -158,7 +159,7 @@ export class Messages extends React.Component<Props, State> {
         return nonEmptyColumns
     }
 
-    timeFormatter(params: any) {
+    timeFormatter(params: ValueFormatterParams): string {
         const date = new Date(parseFloat(params.value));
         const month = (date.getMonth() + 1).toString().padStart(2, "0")
         const day = date.getDate().toString().padStart(2, "0")
@@ -174,14 +175,17 @@ export class Messages extends React.Component<Props, State> {
         this.setState({error: "", warning: "", partition})
     }
 
-    onDataFetched = (data: any) => {
+    onDataFetched = (data: FetchData) => {
         console.log(data)
+        if (!data) {
+            return
+        }
         if (data.error) {
             this.setState({error: data.error})
             return
         }
         const customCols = {cols: {}}
-        const rows = data.messages.map((d: any) => this.getRow(d, customCols))
+        const rows = data.messages.map(d => this.getRow(d, customCols))
         let warning = ""
         if (data.hasTimeout) {
             if (this.props.match.params.topic === undefined) {
@@ -197,6 +201,7 @@ export class Messages extends React.Component<Props, State> {
 
     render() {
         const title = this.props.match.params.topic === undefined ? `Cross-Topic search` : `Messages for topic: ${this.props.match.params.topic}`
+        const offset = this.url.Get(`offset`)
         return (
             <>
                 <KafkaToolbar
@@ -212,7 +217,7 @@ export class Messages extends React.Component<Props, State> {
                         onDataFetched={this.onDataFetched}
                         onDataFetchStarted={this.onDataFetchStarted}
                         url={this.url}
-                        limit={this.url.Get(`limit`) ?? 5}
+                        limit={parseInt(this.url.Get(`limit`) ?? "5")}
                         fromTime={this.url.Get(`from_time`)}
                         toTime={this.url.Get(`to_time`)}
                         searchBy={(this.url.Get(`search_by`) ?? `offset`) as SearchBy}
@@ -225,8 +230,8 @@ export class Messages extends React.Component<Props, State> {
                         partition={this.props.match.params.partition}
                         url={this.url}
                         search={this.state.search}
-                        offset={this.url.Get(`offset`)}
-                        limit={this.url.Get(`limit`) ?? 5}
+                        offset={offset === undefined ? undefined : parseInt(offset)}
+                        limit={parseInt(this.url.Get(`limit`) ?? "5")}
                         fromTime={this.url.Get(`from_time`)}
                         toTime={this.url.Get(`to_time`)}
                         searchBy={(this.url.Get(`search_by`) ?? `offset`) as SearchBy}
