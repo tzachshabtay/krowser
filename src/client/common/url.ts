@@ -35,6 +35,6 @@ export class Url {
         const url = query ? `${this.BaseUrl}?${query}` : this.BaseUrl
 
         //We're using window.history and not the router history because we don't want to navigate away, this is just for sharing url purposes.
-        window.history.replaceState(null, document.title, url)
+        window.history.replaceState(null, document.title, url || "?") //if base url was not set and they are no properties on the url it will be an empty string which seems to be ignored by replaceState so we're defaulting to "?"
     }
 }

@@ -4,12 +4,13 @@
 
 # Krowser
 
-Web UI to browse [kafka](https://kafka.apache.org/) and [schema registry](https://docs.confluent.io/current/schema-registry/index.html).
+Web UI to browse [kafka](https://kafka.apache.org/), [schema registry](https://docs.confluent.io/current/schema-registry/index.html) and [kafka-connect](https://docs.confluent.io/platform/current/connect/).
 
 ## Features
 
 - View kafka's topics, partitions, messages, consumer groups and brokers.
 - View schema registry's subjects and schemas.
+- View kafka-connect's connectors and tasks.
 - The grid view destructures the messages/schemas (even nested json) into separate columns, and each of the columns can be (client-side) filtered and sorted.
 - Support for avro auto-detecting and decoding (via the schema registry). Different subject messages in a topic are supported as well (and as you filter for a specific event type it auto-hides all of the irrelevant columns belonging to the other messages).
 - The raw view shows the data in json format, and allows easy copying to clipboard

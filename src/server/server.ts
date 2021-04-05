@@ -5,8 +5,9 @@ import { Kafka, ResourceTypes, DescribeConfigResponse, Consumer, Admin, GroupDes
 import { SchemaRegistry } from '@ovotech/avro-kafkajs';
 import { Type } from "avsc";
 import { v4 as uuidv4 } from 'uuid';
-import { KAFKA_URLS, SCHEMA_REGISTRY_URL } from "./config";
-import { GetTopicsResult, GetTopicResult, TopicsOffsets, ConsumerOffsets, TopicConsumerGroups, TopicOffsets, GetClusterResult, GetTopicOffsetsByTimestapResult, TopicMessage, TopicMessages, GetTopicMessagesResult, GetSubjectsResult, GetSubjectVersionsResult, GetSchemaResult, GetTopicConsumerGroupsResult, GetTopicOffsetsResult } from "../shared/api";
+import { KAFKA_URLS, SCHEMA_REGISTRY_URL, KAFKA_CONNECT_URL } from "./config";
+import { GetTopicsResult, GetTopicResult, TopicsOffsets, ConsumerOffsets, TopicConsumerGroups, TopicOffsets, GetClusterResult, GetTopicOffsetsByTimestapResult, TopicMessage, TopicMessages, GetTopicMessagesResult, GetSubjectsResult, GetSubjectVersionsResult, GetSchemaResult, GetTopicConsumerGroupsResult, GetTopicOffsetsResult, GetConnectorsResult, GetConnectorStatusResult, GetConnectorConfigResult, GetConnectorTasksResult, GetConnectorTaskStatusResult, GetConnectorTopicsResult } from "../shared/api";
+const fetch = require("node-fetch");
 
 type TopicQueryInput = { topic: string, partition: number, limit: number, offset: number, search: string, timeout?: number}
 
@@ -66,7 +67,7 @@ app.get("/api/topics", async (req, res) => {
 		res.status(200).json(topics)
 	}
 	catch (error) {
-		res.status(500).json({ error })
+		res.status(500).json({ error: error.toString() })
 	}
 })
 
@@ -91,7 +92,7 @@ app.get("/api/topic/:topic", async (req, res) => {
 		}
 	}
 	catch (error) {
-		res.status(500).json({ error })
+		res.status(500).json({ error: error.toString() })
 	}
 })
 
@@ -103,7 +104,7 @@ app.get("/api/topic/:topic/offsets", async (req, res) => {
 		res.status(200).json(out)
 	}
 	catch (error) {
-		res.status(500).json({ error })
+		res.status(500).json({ error: error.toString() })
 	}
 })
 
@@ -113,7 +114,7 @@ app.get("/api/topic/:topic/config", async (req, res) => {
 		res.status(200).json(config)
 	}
 	catch (error) {
-		res.status(500).json({ error })
+		res.status(500).json({ error: error.toString() })
 	}
 })
 
@@ -133,7 +134,7 @@ app.get("/api/topic/:topic/consumer_groups", async (req, res) => {
 		res.status(200).json(groups)
 	}
 	catch (error) {
-		res.status(500).json({ error })
+		res.status(500).json({ error: error.toString() })
 	}
 })
 
@@ -147,7 +148,7 @@ app.get("/api/groups", async (req, res) => {
 	}
 	catch (error) {
 		console.error(error)
-		res.status(500).json({ error })
+		res.status(500).json({ error: error.toString() })
 	}
 })
 
@@ -158,7 +159,7 @@ app.get("/api/members/:group", async (req, res) => {
 		res.status(200).json(groups.groups[0].members)
 	}
 	catch (error) {
-		res.status(500).json({ error })
+		res.status(500).json({ error: error.toString() })
 	}
 })
 
@@ -189,7 +190,7 @@ app.get("/api/cluster", async (req, res) => {
 		res.status(200).json(cluster)
 	}
 	catch (error) {
-		res.status(500).json({ error })
+		res.status(500).json({ error: error.toString() })
 	}
 })
 
@@ -201,7 +202,7 @@ app.get("/api/offsets/:topic/:timestamp", async (req, res) => {
 		res.status(200).json(entries)
 	}
 	catch (error) {
-		res.status(500).json({ error })
+		res.status(500).json({ error: error.toString() })
 	}
 })
 
@@ -237,7 +238,7 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 		res.status(404).json({ error: `partition ${partition} not found for topic ${topic}`})
 	}
 	catch (error) {
-		res.status(500).json({ error })
+		res.status(500).json({ error: error.toString() })
 	}
 })
 
@@ -247,7 +248,7 @@ app.get("/api/schema-registry/subjects", async (req, res) => {
 		res.status(200).json(subjects)
 	}
 	catch (error) {
-		res.status(500).json({ error })
+		res.status(500).json({ error: error.toString() })
 	}
 });
 
@@ -257,7 +258,7 @@ app.get("/api/schema-registry/versions/:subject", async (req, res) => {
 		res.status(200).json(versions)
 	}
 	catch (error) {
-		res.status(500).json({ error })
+		res.status(500).json({ error: error.toString() })
 	}
 })
 
@@ -267,7 +268,93 @@ app.get("/api/schema-registry/schema/:subject/:version", async (req, res) => {
 		res.status(200).json(schema)
 	}
 	catch (error) {
-		res.status(500).json({ error })
+		res.status(500).json({ error: error.toString() })
+	}
+})
+
+app.get("/api/kafka-connect/connectors", async (req, res) => {
+	try {
+		const response = await fetch(`${KAFKA_CONNECT_URL}/connectors`)
+		if (response.status >= 400) {
+			const txt = await response.text()
+			const error = `failed to get connectors, status code ${response.status}, error: ${txt}`
+			res.status(500).json({ error })
+			return
+		}
+		const data: string[] = await response.json()
+		const out: GetConnectorsResult = data;
+		res.status(200).json(out)
+	}
+	catch (error) {
+		res.status(500).json({ error: error.toString() })
+	}
+})
+
+app.get("/api/kafka-connect/connector/:connector/status", async (req, res) => {
+	try {
+		const response = await fetch(`${KAFKA_CONNECT_URL}/connectors/${req.params.connector}/status`)
+		if (response.status >= 400) {
+			const txt = await response.text()
+			const error = `failed to get status for connector ${req.params.connector}, status code ${response.status}, error: ${txt}`
+			res.status(500).json({ error })
+			return
+		}
+		const data: GetConnectorStatusResult = await response.json()
+		res.status(200).json(data)
+	}
+	catch (error) {
+		res.status(500).json({ error: error.toString() })
+	}
+})
+
+app.get("/api/kafka-connect/connector/:connector/config", async (req, res) => {
+	try {
+		const response = await fetch(`${KAFKA_CONNECT_URL}/connectors/${req.params.connector}/config`)
+		if (response.status >= 400) {
+			const txt = await response.text()
+			const error = `failed to get config for connector ${req.params.connector}, status code ${response.status}, error: ${txt}`
+			res.status(500).json({ error })
+			return
+		}
+		const data: GetConnectorConfigResult = await response.json()
+		res.status(200).json(data)
+	}
+	catch (error) {
+		res.status(500).json({ error: error.toString() })
+	}
+})
+
+app.get("/api/kafka-connect/connector/:connector/tasks", async (req, res) => {
+	try {
+		const response = await fetch(`${KAFKA_CONNECT_URL}/connectors/${req.params.connector}/tasks`)
+		if (response.status >= 400) {
+			const txt = await response.text()
+			const error = `failed to get tasks for connector ${req.params.connector}, status code ${response.status}, error: ${txt}`
+			res.status(500).json({ error })
+			return
+		}
+		const data: GetConnectorTasksResult = await response.json()
+		res.status(200).json(data)
+	}
+	catch (error) {
+		res.status(500).json({ error: error.toString() })
+	}
+})
+
+app.get("/api/kafka-connect/connector/:connector/tasks/:task/status", async (req, res) => {
+	try {
+		const response = await fetch(`${KAFKA_CONNECT_URL}/connectors/${req.params.connector}/tasks/${req.params.task}/status`)
+		if (response.status >= 400) {
+			const txt = await response.text()
+			const error = `failed to get task status for connector ${req.params.connector}, task ${req.params.task}, status code ${response.status}, error: ${txt}`
+			res.status(500).json({ error })
+			return
+		}
+		const data: GetConnectorTaskStatusResult = await response.json()
+		res.status(200).json(data)
+	}
+	catch (error) {
+		res.status(500).json({ error: error.toString() })
 	}
 })
 
