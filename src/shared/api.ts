@@ -19,6 +19,15 @@ export type GetTopicResult = MaybeError & { offsets: TopicsOffsets, config?: Des
 export type GetClusterResult = MaybeError & { brokers: Array<Broker>, controller: number | null, clusterId: string }
 export type GetTopicOffsetsByTimestapResult = MaybeError & SeekEntry[]
 export type GetTopicMessagesResult = MaybeError & TopicMessages
+
 export type GetSubjectsResult = MaybeError & string[]
 export type GetSubjectVersionsResult = MaybeError & number[]
 export type GetSchemaResult = MaybeError & Schema
+
+export type ConnectorState = `RUNNING` | `FAILED` | `PAUSED`
+export type ConnectorConfig = { [key: string]: string }
+export type GetConnectorsResult = MaybeError & string[]
+export type GetConnectorStatusResult = MaybeError & { name: string, connector: { state: ConnectorState, worker_id: string }, tasks: { state: ConnectorState, id: number, worker_id: string}[], type: string }
+export type GetConnectorConfigResult = MaybeError & ConnectorConfig
+export type GetConnectorTasksResult = MaybeError & { id: {connector: string, task: number}, config: {[key: string]: string} }[]
+export type GetConnectorTaskStatusResult = MaybeError & { state: ConnectorState, id: number, worker_id: string }

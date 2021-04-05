@@ -14,6 +14,8 @@ import { Versions } from "./schema-registry/versions"
 import { GlobalThemeProvider } from "./common/theme_hook"
 
 import "./style.css";
+import { Connectors } from "./kafka-connect/connectors";
+import { Tasks } from "./kafka-connect/tasks";
 
 const App = () => {
 	return (
@@ -33,6 +35,8 @@ const App = () => {
 					<Route path="/members/:group" exact component={Members} />
 					<Route path="/schema-registry/subjects" exact component={Subjects} />
 					<Route path="/schema-registry/versions/:subject" exact component={Versions} />
+					<Route path="/kafka-connect/connectors" exact component={Connectors} />
+					<Route path="/kafka-connect/tasks/:connector" exact component={Tasks} />
 				</div>
 			</Router>
 		</GlobalThemeProvider>

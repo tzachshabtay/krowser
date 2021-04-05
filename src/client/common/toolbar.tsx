@@ -75,12 +75,19 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const ThemeToggle: React.FunctionComponent = () => {
+interface ThemeProps {
+  OnThemeChanged?: (theme: string) => void
+}
+
+const ThemeToggle: React.FunctionComponent<ThemeProps> = (props) => {
   const {theme, saveTheme} = useTheme()
 
   const handleTheme = (event: React.MouseEvent<HTMLElement>, newTheme: string) => {
     if (newTheme !== null) {
       saveTheme(newTheme)
+      if (props.OnThemeChanged) {
+        props.OnThemeChanged(newTheme)
+      }
     }
   };
 
@@ -108,6 +115,7 @@ interface Props {
     onSearch?: React.ChangeEventHandler<HTMLTextAreaElement | HTMLInputElement>;
     searchText?: string;
     url: Url;
+    OnThemeChanged?: (theme: string) => void
 }
 
 export const KafkaToolbar: React.FunctionComponent<Props> = (props) => {
@@ -162,6 +170,9 @@ export const KafkaToolbar: React.FunctionComponent<Props> = (props) => {
                 <Link href="/schema-registry/subjects" color="inherit">
                   <MenuItem>Schema-Registry (subjects)</MenuItem>
                 </Link>
+                <Link href="/kafka-connect/connectors" color="inherit">
+                  <MenuItem>Kafka-Connect (connectors)</MenuItem>
+                </Link>
                 <Divider/>
                 <Link href="/topics/messages" color="inherit">
                   <MenuItem><SearchIcon /> Search across topics</MenuItem>
@@ -175,7 +186,7 @@ export const KafkaToolbar: React.FunctionComponent<Props> = (props) => {
           <Typography className={classes.title} variant="h6" noWrap>
             {props.title}
           </Typography>
-          <ThemeToggle/>
+          <ThemeToggle OnThemeChanged={props.OnThemeChanged}/>
           {props.onSearch && (
             <div className={classes.search}>
                 <div className={classes.searchIcon}>

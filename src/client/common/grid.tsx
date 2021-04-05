@@ -34,6 +34,22 @@ export const Grid: React.FunctionComponent<GridProps> = (props) => {
                 onFilterChanged={props.onFilterChanged}
                 enableCellTextSelection={true}
                 pagination={true}
+                columnTypes={
+                    {
+                        connectorState: { cellStyle: params => {
+                            switch (params.value) {
+                                case `RUNNING`:
+                                    return {color: theme === `dark` ? `lightgreen` : `darkgreen` }
+                                case `FAILED`:
+                                    return {color: theme === `dark` ? `lightcoral` : `red`}
+                                case `PAUSED`:
+                                    return {color: theme === `dark` ? `orange` : `darkorange`}
+                                default:
+                                    return {}
+                            }
+                        }},
+                    }
+                }
             >
             </AgGridReact>
         </div>
