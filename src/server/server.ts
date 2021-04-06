@@ -6,7 +6,7 @@ import { SchemaRegistry } from '@ovotech/avro-kafkajs';
 import { Type } from "avsc";
 import { v4 as uuidv4 } from 'uuid';
 import { KAFKA_URLS, SCHEMA_REGISTRY_URL, KAFKA_CONNECT_URL } from "./config";
-import { GetTopicsResult, GetTopicResult, TopicsOffsets, ConsumerOffsets, TopicConsumerGroups, TopicOffsets, GetClusterResult, GetTopicOffsetsByTimestapResult, TopicMessage, TopicMessages, GetTopicMessagesResult, GetSubjectsResult, GetSubjectVersionsResult, GetSchemaResult, GetTopicConsumerGroupsResult, GetTopicOffsetsResult, GetConnectorsResult, GetConnectorStatusResult, GetConnectorConfigResult, GetConnectorTasksResult, GetConnectorTaskStatusResult, GetConnectorTopicsResult } from "../shared/api";
+import { GetTopicsResult, GetTopicResult, TopicsOffsets, ConsumerOffsets, TopicConsumerGroups, TopicOffsets, GetClusterResult, GetTopicOffsetsByTimestapResult, TopicMessage, TopicMessages, GetTopicMessagesResult, GetSubjectsResult, GetSubjectVersionsResult, GetSchemaResult, GetTopicConsumerGroupsResult, GetTopicOffsetsResult, GetConnectorsResult, GetConnectorStatusResult, GetConnectorConfigResult, GetConnectorTasksResult, GetConnectorTaskStatusResult } from "../shared/api";
 const fetch = require("node-fetch");
 
 type TopicQueryInput = { topic: string, partition: number, limit: number, offset: number, search: string, timeout?: number}
