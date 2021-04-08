@@ -22,7 +22,7 @@ export type GetTopicMessagesResult = MaybeError & TopicMessages
 
 export type GetSubjectsResult = MaybeError & string[]
 export type GetSubjectVersionsResult = MaybeError & number[]
-export type GetSchemaResult = MaybeError & Schema
+export type GetSchemaResult = MaybeError & { schema: Schema, id: number }
 
 export type ConnectorState = `RUNNING` | `FAILED` | `PAUSED`
 export type ConnectorConfig = { [key: string]: string }

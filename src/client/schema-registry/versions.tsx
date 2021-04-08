@@ -38,7 +38,8 @@ interface RecordType {
 
 type Version = {
     version: number,
-    schema?: GetSchemaResult,
+    schema?: Schema,
+    schemaID?: number,
     [key: string]: any,
 }
 
@@ -92,8 +93,9 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
             this.setState({loading: false, error: data.error, errorPrefix: `Failed to fetch schema for version ${version.version}. Error: `})
             return
         }
-        version.schema = data
-        this.addToRow(version, data as RecordType, customCols, "")
+        version.schema = data.schema
+        version.schemaID = data.id
+        this.addToRow(version, data.schema as RecordType, customCols, "")
         if (this.gridApi) {
             this.gridApi.refreshCells()
         }
@@ -134,6 +136,7 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
 
     getColumnDefs() {
         const cols = [
+            { headerName: "Schema ID", field: "schemaID", filter: "agNumberColumnFilter" },
             { headerName: "Version", field: "version", filter: "agNumberColumnFilter" },
             { headerName: "Type", field: "schema.type" },
             { headerName: "Name", field: "schema.name" },
