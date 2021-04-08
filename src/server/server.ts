@@ -2,8 +2,8 @@ import express from "express";
 import http from "http";
 import path from "path";
 import { Kafka, ResourceTypes, DescribeConfigResponse, Consumer, Admin, GroupDescriptions } from "kafkajs";
-import { SchemaRegistry } from '@ovotech/avro-kafkajs';
-import { Type } from "avsc";
+import { SchemaRegistry, SchemaVersion } from '@ovotech/avro-kafkajs';
+import { Schema, Type } from "avsc";
 import { v4 as uuidv4 } from 'uuid';
 import { KAFKA_URLS, SCHEMA_REGISTRY_URL, KAFKA_CONNECT_URL } from "./config";
 import { GetTopicsResult, GetTopicResult, TopicsOffsets, ConsumerOffsets, TopicConsumerGroups, TopicOffsets, GetClusterResult, GetTopicOffsetsByTimestapResult, TopicMessage, TopicMessages, GetTopicMessagesResult, GetSubjectsResult, GetSubjectVersionsResult, GetSchemaResult, GetTopicConsumerGroupsResult, GetTopicOffsetsResult, GetConnectorsResult, GetConnectorStatusResult, GetConnectorConfigResult, GetConnectorTasksResult, GetConnectorTaskStatusResult } from "../shared/api";
@@ -264,8 +264,10 @@ app.get("/api/schema-registry/versions/:subject", async (req, res) => {
 
 app.get("/api/schema-registry/schema/:subject/:version", async (req, res) => {
 	try {
-		const schema: GetSchemaResult = await schemaRegistry.getSubjectVersionSchema(req.params.subject, parseInt(req.params.version))
-		res.status(200).json(schema)
+		const schemaVersion: SchemaVersion = await schemaRegistry.getSubjectVersion(req.params.subject, parseInt(req.params.version))
+		const schema: Schema = JSON.parse(schemaVersion.schema)
+		const out: GetSchemaResult = { schema, id: schemaVersion.id }
+		res.status(200).json(out)
 	}
 	catch (error) {
 		res.status(500).json({ error: error.toString() })

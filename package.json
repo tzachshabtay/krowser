@@ -36,7 +36,7 @@
     "@material-ui/core": "^4.11.3",
     "@material-ui/icons": "^4.9.1",
     "@material-ui/lab": "^4.0.0-alpha.56",
-    "@ovotech/avro-kafkajs": "^0.3.0",
+    "@ovotech/avro-kafkajs": "^0.6.3",
     "@types/long": "^4.0.1",
     "ag-grid-community": "^23.2.0",
     "ag-grid-react": "^23.2.0",
