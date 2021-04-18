@@ -15,7 +15,6 @@ interface Props extends RouteComponentProps<{ topic?: string, partition?: string
 }
 
 type State = {
-    search: string;
     rows: any[];
     error?: string;
     warning: string;
@@ -25,7 +24,6 @@ type State = {
 
 export class Messages extends React.Component<Props, State> {
     state: State = {
-        search: "",
         rows: [],
         customCols: {cols: {}},
         error: "",
@@ -39,13 +37,6 @@ export class Messages extends React.Component<Props, State> {
     constructor(props: Props) {
         super(props);
         this.url = new Url(props.location.search, ``);
-    }
-
-    componentDidMount() {
-        const search = this.url.Get(`search`) || ``
-        if (search) {
-            this.setState({search})
-        }
     }
 
     getRow = (data: TopicMessage, customCols: {cols: {}}): any => {
@@ -207,8 +198,7 @@ export class Messages extends React.Component<Props, State> {
                 <KafkaToolbar
                     title={title}
                     url={this.url}
-                    searchText={this.state.search}
-                    onSearch={e => this.setState({ search: e.target.value })}>
+                >
                 </KafkaToolbar>
                 <br />
                 { this.props.match.params.topic === undefined ?
@@ -222,29 +212,28 @@ export class Messages extends React.Component<Props, State> {
                         toTime={this.url.Get(`to_time`)}
                         searchBy={(this.url.Get(`search_by`) ?? `offset`) as SearchBy}
                         selectedTopics={this.props.match.params.topics}
-                        search={this.state.search}>
+                        >
                     </MultiTopicsInput>
                 ) : (
                     <SingleTopicInput
                         topic={this.props.match.params.topic}
                         partition={this.props.match.params.partition}
                         url={this.url}
-                        search={this.state.search}
                         offset={offset === undefined ? undefined : parseInt(offset)}
                         limit={parseInt(this.url.Get(`limit`) ?? "5")}
                         fromTime={this.url.Get(`from_time`)}
                         toTime={this.url.Get(`to_time`)}
                         searchBy={(this.url.Get(`search_by`) ?? `offset`) as SearchBy}
                         onDataFetched={this.onDataFetched}
-                        onDataFetchStarted={this.onDataFetchStarted}>
+                        onDataFetchStarted={this.onDataFetchStarted}
+                        >
                     </SingleTopicInput>
                 )}
                 { this.state.warning && (<Alert severity="warning">{this.state.warning}</Alert>)}
                 { this.state.error && (<Alert severity="error">{this.state.error}</Alert>)}
                 <ErrorMsg error={this.state.error} prefix="Failed to fetch data. Error: "></ErrorMsg>
                 <DataView
-                    search={r => r.rowValue.includes(this.state.search) || r.rowKey.includes(this.state.search) || r.rowType.includes(this.state.search)}
-                    searchQuery={this.state.search}
+                    search={r => `${r.rowValue},${r.rowKey},${r.rowType}`}
                     rows={this.state.rows}
                     raw={this.state.rows.map(r => r.rowJson)}
                     url={this.url}

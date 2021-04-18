@@ -10,7 +10,6 @@ import { ColDef, GridApi, GridReadyEvent } from "ag-grid-community";
 import { ReplaceDots } from "./connectors";
 
 type State = {
-    search: string;
     loading: boolean;
     error?: string;
     customCols: {cols: {}};
@@ -25,7 +24,7 @@ type Task = {
 }
 
 export class Tasks extends React.Component<RouteComponentProps<{ connector: string }>, State> {
-    state: State = { loading: true, customCols: {cols: {}}, rows: [], search: "", error: "" }
+    state: State = { loading: true, customCols: {cols: {}}, rows: [], error: "" }
     gridApi: GridApi | null = null;
     url: Url;
 
@@ -46,13 +45,12 @@ export class Tasks extends React.Component<RouteComponentProps<{ connector: stri
             return
         }
         const rows: Task[] = []
-        const search = this.url.Get(`search`) || ``
         for (const c of data) {
             const config = ReplaceDots(c.config)
             rows.push({id: c.id.task, state: "Loading", workerId: "Loading", config })
             this.state.customCols.cols = {...this.state.customCols.cols, ...config}
         }
-        this.setState({ loading: false, rows, search })
+        this.setState({ loading: false, rows })
         for (const c of rows) {
             await this.fetchTaskStatus(c)
         }
@@ -98,15 +96,13 @@ export class Tasks extends React.Component<RouteComponentProps<{ connector: stri
                 <KafkaToolbar
                     title={`Tasks for connector: ${this.props.match.params.connector}`}
                     url={this.url}
-                    searchText={this.state.search}
-                    onSearch={e => this.setState({ search: e.target.value })}
-                    OnThemeChanged={_ => this.refreshGrid()}>
+                    OnThemeChanged={_ => this.refreshGrid()}
+                >
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
                 <ErrorMsg error={this.state.error} prefix="Failed to fetch tasks. Error: "></ErrorMsg>
                 {!this.state.loading && <DataView
-                    searchQuery={this.state.search}
-                    search={r => r.host.includes(this.state.search)}
+                    search={(r: Task) => `${r.state},${r.workerId}`}
                     rows={this.state.rows}
                     raw={this.state.rows}
                     url={this.url}

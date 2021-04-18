@@ -11,7 +11,6 @@ import { Schema } from "avsc";
 
 
 type State = {
-    search: string;
     loading: boolean;
     rows: any[];
     customCols: {cols: {}};
@@ -53,7 +52,7 @@ interface EnumType {
 }
 
 export class Versions extends React.Component<RouteComponentProps<{ subject: string }>, State> {
-    state: State = { search: "", loading: true, rows: [], customCols: {cols: {}}, error: "", errorPrefix: "" }
+    state: State = { loading: true, rows: [], customCols: {cols: {}}, error: "", errorPrefix: "" }
     gridApi: GridApi | null = null;
     columnApi: ColumnApi | null = null;
     url: Url;
@@ -77,8 +76,7 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
         }
         const results = data.map(r => (
             { version: r }))
-        const search = this.url.Get(`search`) || ``
-        this.setState({ loading: false, rows: results, search })
+        this.setState({ loading: false, rows: results })
         const customCols = {cols: {}}
         for (const version of results) {
             await this.fetchSchema(version, customCols)
@@ -164,14 +162,12 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
                 <KafkaToolbar
                     title={`Schemas for subject ${this.props.match.params.subject}`}
                     url={this.url}
-                    searchText={this.state.search}
-                    onSearch={e => this.setState({ search: e.target.value })}>
+                >
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
                 <ErrorMsg error={this.state.error} prefix={this.state.errorPrefix}></ErrorMsg>
                 {!this.state.loading && <DataView
-                    searchQuery={this.state.search}
-                    search={r => r.schema.includes(this.state.search)}
+                    search={(r: Version) => JSON.stringify(r.schema ?? "")}
                     rows={this.state.rows}
                     raw={this.state.rows.map(r => ({version: r.version, schema: r.schema}))}
                     url={this.url}

@@ -68,13 +68,13 @@ export class Partitions extends React.Component<RouteComponentProps<{ topic: str
                 <KafkaToolbar
                     title={`Partitions for topic: ${this.props.match.params.topic}`}
                     url={this.url}
+                    hideSearch={true}
                 >
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
                 <ErrorMsg error={this.state.error} prefix="Failed to fetch partitions. Error: "></ErrorMsg>
                 {!this.state.loading && <DataView
-                    searchQuery=""
-                    search={_ => true}
+                    search={_ => ""}
                     rows={this.state.rows}
                     raw={this.state.rows.map(r => ({topic: r.topic, ...r.raw}))}
                     url={this.url}

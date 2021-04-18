@@ -4,13 +4,14 @@ import Toolbar from '@material-ui/core/Toolbar';
 import IconButton from '@material-ui/core/IconButton';
 import Typography from '@material-ui/core/Typography';
 import InputBase from '@material-ui/core/InputBase';
-import { fade, makeStyles } from '@material-ui/core/styles';
+import { fade, makeStyles, withStyles } from '@material-ui/core/styles';
 import MenuIcon from '@material-ui/icons/Menu';
 import MenuItem from '@material-ui/core/MenuItem';
 import Menu from '@material-ui/core/Menu';
 import SearchIcon from '@material-ui/icons/Search';
 import Tooltip from '@material-ui/core/Tooltip';
 import GitHubIcon from '@material-ui/icons/GitHub';
+import InputAdornment from '@material-ui/core/InputAdornment';
 import { Divider } from '@material-ui/core';
 import Link from '@material-ui/core/Link';
 import { useTheme } from './theme_hook';
@@ -18,7 +19,10 @@ import ToggleButton from '@material-ui/lab/ToggleButton';
 import ToggleButtonGroup from '@material-ui/lab/ToggleButtonGroup';
 import WbSunnyIcon from '@material-ui/icons/WbSunny';
 import NightsStayIcon from '@material-ui/icons/NightsStay';
+import Icon from '@mdi/react';
+import { mdiRegex, mdiFormatLetterCase } from '@mdi/js';
 import { Url } from './url';
+import { SearchStyle } from '../../shared/search';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -110,17 +114,52 @@ const ThemeToggle: React.FunctionComponent<ThemeProps> = (props) => {
   );
 }
 
+const SearchButtonGroup = withStyles((theme) => ({
+  grouped: {
+    margin: theme.spacing(0),
+    border: 'none',
+    borderRadius: theme.shape.borderRadius,
+  },
+}))(ToggleButtonGroup);
+
+const useSearchButtonStyles = makeStyles((theme) => ({
+  root: (props: {selectColor: string, hoverColor: string}) => {
+    return {
+      '&$selected': {
+        backgroundColor: props.selectColor,
+      },
+      '&:hover': {
+        backgroundColor: `${props.hoverColor} !important`,
+      },
+    }
+  },
+  selected: (_: {selectColor: string, hoverColor: string}) => { return {}},
+}));
+
+function SearchToggleButton(props: any) {
+  const { selectColor, hoverColor, ...other } = props;
+  const classes = useSearchButtonStyles({ selectColor, hoverColor });
+  return <ToggleButton classes={classes} {...other} />;
+}
+
 interface Props {
     title: string;
-    onSearch?: React.ChangeEventHandler<HTMLTextAreaElement | HTMLInputElement>;
-    searchText?: string;
     url: Url;
+    hideSearch?: boolean;
     OnThemeChanged?: (theme: string) => void
 }
 
 export const KafkaToolbar: React.FunctionComponent<Props> = (props) => {
   const classes = useStyles();
   const [anchorElement, setAnchorElement] = React.useState(null);
+
+  const [searchStyle, setSearchStyle] = React.useState((props.url.Get(`search_style`) || ``) as SearchStyle);
+  const [searchPattern, setSearchPattern] = React.useState((props.url.Get(`search`) || ``) );
+
+  const {theme, _} = useTheme()
+  const searchButtonColor = theme === `dark` ? `dimgray` : `silver`
+  const searchButtonSelectedColor = theme === `dark` ? `rgb(106, 186, 251)` : `rgb(64,82,181)`
+  const searchButtonHoverColor = theme === `dark` ? `rgb(131, 197, 251)` : `rgb(82, 97, 183)`
 
   const menuOpen = Boolean(anchorElement);
   const openMenu = (event: any) => {
@@ -187,7 +226,7 @@ export const KafkaToolbar: React.FunctionComponent<Props> = (props) => {
             {props.title}
           </Typography>
           <ThemeToggle OnThemeChanged={props.OnThemeChanged}/>
-          {props.onSearch && (
+          {!props.hideSearch && (
             <div className={classes.search}>
                 <div className={classes.searchIcon}>
                 <SearchIcon />
@@ -199,12 +238,44 @@ export const KafkaToolbar: React.FunctionComponent<Props> = (props) => {
                     input: classes.inputInput,
                 }}
                 inputProps={{ 'aria-label': 'search' }}
-                value={props.searchText}
+                value={searchPattern}
+                endAdornment={
+                  <>
+                  <InputAdornment position="end">
+                  <SearchButtonGroup
+                    size="small"
+                    value={searchStyle}
+                    exclusive
+                    onChange={(e, value) => { setSearchStyle(value); props.url.Set({ name: `search_style`, val: value})}}
+                    aria-label="search options"
+                  >
+                      <SearchToggleButton
+                        selectColor={searchButtonSelectedColor}
+                        hoverColor={searchButtonHoverColor}
+                        aria-label="Match Case"
+                        value="case-sensitive"
+                      >
+                        <Tooltip title="Match Case">
+                          <Icon path={mdiFormatLetterCase} size={1} color={searchButtonColor}/>
+                        </Tooltip>
+                      </SearchToggleButton>
+                      <SearchToggleButton
+                        selectColor={searchButtonSelectedColor}
+                        hoverColor={searchButtonHoverColor}
+                        aria-label="Use Regular Expression"
+                        value="regex"
+                      >
+                        <Tooltip title="Use Regular Expression">
+                          <Icon path={mdiRegex} size={1} color={searchButtonColor}/>
+                        </Tooltip>
+                      </SearchToggleButton>
+                    </SearchButtonGroup>
+                  </InputAdornment>
+                  </>
+                }
                 onChange={e => {
                   props.url.Set({name: `search`, val: e.target.value})
-                  if (props.onSearch) {
-                    props.onSearch(e)
-                  }
+                  setSearchPattern(e.target.value)
                 }}
                 />
             </div>

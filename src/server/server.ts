@@ -7,9 +7,10 @@ import { Schema, Type } from "avsc";
 import { v4 as uuidv4 } from 'uuid';
 import { KAFKA_URLS, SCHEMA_REGISTRY_URL, KAFKA_CONNECT_URL } from "./config";
 import { GetTopicsResult, GetTopicResult, TopicsOffsets, ConsumerOffsets, TopicConsumerGroups, TopicOffsets, GetClusterResult, GetTopicOffsetsByTimestapResult, TopicMessage, TopicMessages, GetTopicMessagesResult, GetSubjectsResult, GetSubjectVersionsResult, GetSchemaResult, GetTopicConsumerGroupsResult, GetTopicOffsetsResult, GetConnectorsResult, GetConnectorStatusResult, GetConnectorConfigResult, GetConnectorTasksResult, GetConnectorTaskStatusResult } from "../shared/api";
+import { SearchStyle, Includes } from "../shared/search";
 const fetch = require("node-fetch");
 
-type TopicQueryInput = { topic: string, partition: number, limit: number, offset: number, search: string, timeout?: number}
+type TopicQueryInput = { topic: string, partition: number, limit: number, offset: number, search: string, timeout?: number, searchStyle: SearchStyle}
 
 const schemaRegistry = new SchemaRegistry({ uri: SCHEMA_REGISTRY_URL });
 
@@ -212,6 +213,7 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 		const offset = req.query.offset ? parseInt(req.query.offset.toString()) : 0
 		const topic = req.params.topic
 		const search = req.query.search ? req.query.search as string : ""
+		const searchStyle = req.query.search_style ? req.query.search_style as SearchStyle : ""
 		const timeout = req.query.timeout ? parseInt(req.query.timeout.toString()) : 20000
 		const partition = parseInt(req.params.partition)
 		const partitions = await withRetry("fetchTopicOffsets", () => kafka.Admin.fetchTopicOffsets(topic))
@@ -231,7 +233,7 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 				res.status(200).json({messages: []})
 				return
 			}
-			const messages: GetTopicMessagesResult = await getMessages({topic, partition, limit, offset, search, timeout})
+			const messages: GetTopicMessagesResult = await getMessages({topic, partition, limit, offset, search, searchStyle, timeout})
 			res.status(200).json(messages)
 			return
 		}
@@ -458,7 +460,8 @@ const getMessages = async (input: TopicQueryInput): Promise<TopicMessages> => {
 				numConsumed++
 				let filteredOut = false
 				if (input.search) {
-					if (!value.includes(input.search) && !key.includes(input.search) && !(schemaType?.name?.includes(input.search) ?? true)) {
+					const text: string = `${value},${key},${schemaType?.name ?? ""}`
+					if (!Includes(text, input.search, input.searchStyle)) {
 						filteredOut = true
 						console.log(`Ignoring message from offset ${message.offset}, filtered out by search`)
 					}

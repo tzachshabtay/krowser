@@ -11,7 +11,6 @@ import { Url } from "../common/url";
 import { GetTopicConsumerGroupsResult } from "../../shared/api";
 
 type State = {
-    search: string;
     loading: boolean;
     error?: string;
     rows: Group[];
@@ -49,7 +48,7 @@ type Group = {
 }
 
 export class TopicGroups extends React.Component<RouteComponentProps<{ topic: string }>, State> {
-    state: State = { search: "", loading: true, rows: [], data: [], error: "" }
+    state: State = { loading: true, rows: [], data: [], error: "" }
     url: Url;
 
     constructor(props: RouteComponentProps<{ topic: string }>) {
@@ -83,8 +82,7 @@ export class TopicGroups extends React.Component<RouteComponentProps<{ topic: st
                 })
             }
         }
-        const search = this.url.Get(`search`) || ``
-        this.setState({ data, loading: false, rows: results, search })
+        this.setState({ data, loading: false, rows: results })
     }
 
     getColumnDefs() {
@@ -105,15 +103,12 @@ export class TopicGroups extends React.Component<RouteComponentProps<{ topic: st
                 <KafkaToolbar
                     title={`Consumer groups for topic: ${this.props.match.params.topic}`}
                     url={this.url}
-                    searchText={this.state.search}
-                    onSearch={e => this.setState({ search: e.target.value })}
                 >
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
                 <ErrorMsg error={this.state.error} prefix="Failed to fetch consumer groups. Error: "></ErrorMsg>
                 {!this.state.loading && <DataView
-                    searchQuery={this.state.search}
-                    search={r => r.name.includes(this.state.search)}
+                    search={(r: Group) => r.name}
                     rows={this.state.rows}
                     raw={this.state.data}
                     url={this.url}

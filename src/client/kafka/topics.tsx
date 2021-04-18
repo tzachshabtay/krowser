@@ -12,7 +12,6 @@ import { DescribeConfigResponse, ITopicMetadata } from "kafkajs";
 import { History } from 'history';
 
 type State = {
-    search: string;
     loading: boolean;
     error?: string;
     errorPrefix: string;
@@ -57,7 +56,7 @@ type Topic = {
 }
 
 export class Topics extends React.Component<RouteComponentProps, State> {
-    state: State = { search: "", loading: true, rows: [], error: "", errorPrefix: "" }
+    state: State = { loading: true, rows: [], error: "", errorPrefix: "" }
     gridApi: GridApi | null = null;
     columnApi: ColumnApi | null = null;
     url: Url;
@@ -81,8 +80,7 @@ export class Topics extends React.Component<RouteComponentProps, State> {
         }
         const results: Topic[] = data.topics.map((r: ITopicMetadata) => (
             { topic: r.name, num_partitions: r.partitions.length, raw: r, history: this.props.history }))
-        const search = this.url.Get(`search`) || ``
-        this.setState({ loading: false, rows: results, search })
+        this.setState({ loading: false, rows: results })
         for (const topic of results) {
             await this.fetchTopic(topic)
         }
@@ -136,14 +134,12 @@ export class Topics extends React.Component<RouteComponentProps, State> {
                 <KafkaToolbar
                     title="Topics"
                     url={this.url}
-                    searchText={this.state.search}
-                    onSearch={e => this.setState({ search: e.target.value })}>
+                >
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
                 <ErrorMsg error={this.state.error} prefix={this.state.errorPrefix}></ErrorMsg>
                 {!this.state.loading && <DataView
-                    searchQuery={this.state.search}
-                    search={r => r.topic.includes(this.state.search)}
+                    search={(r: Topic) => r.topic}
                     rows={this.state.rows}
                     raw={this.state.rows.map(r => ({...r.raw, num_messages: r.num_messages, offsets: r.offsets, config: r.config, groups: r.groups }))}
                     url={this.url}
