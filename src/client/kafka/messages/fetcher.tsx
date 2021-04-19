@@ -136,7 +136,7 @@ export class Fetcher extends React.Component<Props, State> {
 
     async componentDidMount() {
         this.updateUrl()
-        await this.updateUrl()
+        await this.updateSearch()
         this.props.url.Subscribe(this.onUrlChanged)
         await this.fetchMessages(10000)
     }
@@ -320,7 +320,7 @@ export class Fetcher extends React.Component<Props, State> {
                 topic: this.props.topics.length > 1 ? `Topic ${topic}, ` : "",
             }})
             const response = await fetch(
-                `/api/messages/${topic}/${partition}?limit=${limit}&offset=${cursor}&search=${this.state.search}&search_style=${this.state.searchStyle}&timeout=${timeout}`,
+                `/api/messages/${topic}/${partition}?limit=${limit}&offset=${cursor}&search=${encodeURIComponent(this.state.search)}&search_style=${this.state.searchStyle}&timeout=${timeout}`,
                 {signal: this.state.abortController?.signal}
             )
             if (this.state.isCanceled) {
