@@ -14,7 +14,7 @@ export const CardView: React.FunctionComponent<CardViewProps> = (props) => {
     const search: Search = UseSearch(props.url)
 
     let raw = props.raw
-    if (search) {
+    if (search.pattern) {
         raw = filterJson(props.raw, search)
     }
     const { theme, _ } = useTheme()
