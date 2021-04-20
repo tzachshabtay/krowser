@@ -11,7 +11,6 @@ import { GetSubjectsResult, GetSubjectVersionsResult } from "../../shared/api";
 import { History } from 'history';
 
 type State = {
-    search: string;
     loading: boolean;
     rows: Subject[];
     error?: string;
@@ -25,14 +24,14 @@ class ViewVersionsButton extends React.Component<CellProps, {}> {
 }
 
 type Subject = {
-    subject: String,
+    subject: string,
     versions?: GetSubjectVersionsResult,
     num_versions?: number,
     history: History<unknown>,
 }
 
 export class Subjects extends React.Component<RouteComponentProps, State> {
-    state: State = { search: "", loading: true, rows: [], error: "", errorPrefix: "" }
+    state: State = { loading: true, rows: [], error: "", errorPrefix: "" }
     gridApi: GridApi | null = null;
     columnApi: ColumnApi | null = null;
     url: Url;
@@ -56,8 +55,7 @@ export class Subjects extends React.Component<RouteComponentProps, State> {
         }
         const results = data.map(r => (
             { subject: r, history: this.props.history }))
-        const search = this.url.Get(`search`) || ``
-        this.setState({ loading: false, rows: results, search })
+        this.setState({ loading: false, rows: results })
         for (const subject of results) {
             await this.fetchSubject(subject)
         }
@@ -91,14 +89,12 @@ export class Subjects extends React.Component<RouteComponentProps, State> {
                 <KafkaToolbar
                     title="Subjects"
                     url={this.url}
-                    searchText={this.state.search}
-                    onSearch={e => this.setState({ search: e.target.value })}>
+                >
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
                 <ErrorMsg error={this.state.error} prefix={this.state.errorPrefix}></ErrorMsg>
                 {!this.state.loading && <DataView
-                    searchQuery={this.state.search}
-                    search={r => r.subject.includes(this.state.search)}
+                    search={(r: Subject) => r.subject}
                     rows={this.state.rows}
                     raw={this.state.rows.map(r => ({subject: r.subject, versions: r.versions}))}
                     url={this.url}

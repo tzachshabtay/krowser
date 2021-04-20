@@ -10,6 +10,7 @@ import Fade from '@material-ui/core/Fade';
 import { GoButton } from './go_button';
 import { ErrorMsg} from '../../common/error_msg';
 import { Url } from '../../common/url';
+import { SearchStyle } from '../../../shared/search';
 import Box from '@material-ui/core/Box';
 import Typography from '@material-ui/core/Typography';
 import { GetTopicMessagesResult, GetTopicOffsetsByTimestapResult, GetTopicOffsetsResult, TopicOffsets } from "../../../shared/api";
@@ -38,7 +39,6 @@ interface Props {
     limit?: number;
     fromTime?: string;
     toTime?: string;
-    search: string;
     searchBy: SearchBy;
     onDataFetched: (data: FetchData) => void;
     onDataFetchStarted: (partition: string) => void;
@@ -49,6 +49,8 @@ interface Props {
 }
 
 type State = {
+    search: string;
+    searchStyle: SearchStyle;
     searchBy: SearchBy;
     offset: number;
     limit: number;
@@ -111,6 +113,8 @@ const DateTimeField: React.FunctionComponent<DateTimeInputProps> = (props) => {
 
 export class Fetcher extends React.Component<Props, State> {
     state: State = {
+        search: "",
+        searchStyle: "",
         offset: this.props.offset ?? 0,
         limit: this.props.limit ?? 5,
         fromTime: this.props.fromTime ?? "",
@@ -132,7 +136,23 @@ export class Fetcher extends React.Component<Props, State> {
 
     async componentDidMount() {
         this.updateUrl()
+        await this.updateSearch()
+        this.props.url.Subscribe(this.onUrlChanged)
         await this.fetchMessages(10000)
+    }
+
+    componentWillUnmount() {
+        this.props.url.Unsubscribe(this.onUrlChanged)
+    }
+
+    async updateSearch() {
+        const search = this.props.url.Get(`search`) || ``
+        const searchStyle = (this.props.url.Get(`search_style`) || ``) as SearchStyle
+        await this.setState({search, searchStyle})
+    }
+
+    onUrlChanged = (_: string) => {
+        this.updateSearch()
     }
 
     getOffsetForTime = async (topic: string, partition: number, time: string): Promise<number | undefined> => {
@@ -300,7 +320,7 @@ export class Fetcher extends React.Component<Props, State> {
                 topic: this.props.topics.length > 1 ? `Topic ${topic}, ` : "",
             }})
             const response = await fetch(
-                `/api/messages/${topic}/${partition}?limit=${limit}&offset=${cursor}&search=${this.props.search}&timeout=${timeout}`,
+                `/api/messages/${topic}/${partition}?limit=${limit}&offset=${cursor}&search=${encodeURIComponent(this.state.search)}&search_style=${this.state.searchStyle}&timeout=${timeout}`,
                 {signal: this.state.abortController?.signal}
             )
             if (this.state.isCanceled) {

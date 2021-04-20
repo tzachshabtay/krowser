@@ -2,14 +2,17 @@ import React from "react";
 import { AgGridReact } from 'ag-grid-react';
 import { GridReadyEvent, ColDef, FilterChangedEvent } from 'ag-grid-community';
 import { useTheme } from './theme_hook'
+import { Url } from "./url";
 
 import 'ag-grid-community/dist/styles/ag-grid.css';
 import 'ag-grid-community/dist/styles/ag-theme-alpine-dark.css';
 import 'ag-grid-community/dist/styles/ag-theme-alpine.css';
+import { Search, UseSearch } from "./use_search";
+import { Includes } from "../../shared/search";
 
 export interface GridProps {
-    searchQuery: string;
-    search: (row: any) => boolean;
+    url: Url;
+    search: (row: any) => string;
     rows: any[];
     columnDefs: ColDef[];
     onGridReady?(event: GridReadyEvent): void;
@@ -17,9 +20,10 @@ export interface GridProps {
 }
 
 export const Grid: React.FunctionComponent<GridProps> = (props) => {
+    const search: Search = UseSearch(props.url)
     let rows = props.rows
-    if (props.searchQuery) {
-        rows = rows.filter(props.search)
+    if (search.pattern) {
+        rows = rows.filter(r => Includes(props.search(r), search.pattern, search.style))
     }
     const { theme, _ } = useTheme()
     const cssTheme = theme === `dark` ? `ag-theme-alpine-dark` : `ag-theme-alpine`

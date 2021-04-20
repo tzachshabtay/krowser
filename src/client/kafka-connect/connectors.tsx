@@ -11,7 +11,6 @@ import { ColDef, GridApi, GridReadyEvent } from "ag-grid-community";
 import { History } from 'history';
 
 type State = {
-    search: string;
     loading: boolean;
     error?: string;
     customCols: {cols: {}};
@@ -44,7 +43,7 @@ export function ReplaceDots(data: ConnectorConfig): ConnectorConfig {
 }
 
 export class Connectors extends React.Component<RouteComponentProps, State> {
-    state: State = { loading: true, customCols: {cols: {}}, rows: [], search: "", error: "" }
+    state: State = { loading: true, customCols: {cols: {}}, rows: [], error: "" }
     gridApi: GridApi | null = null;
     url: Url;
 
@@ -65,8 +64,7 @@ export class Connectors extends React.Component<RouteComponentProps, State> {
             return
         }
         const rows: Connector[] = data.map(c => ({name: c, state: "Loading", workerId: "Loading", type: "Loading", history: this.props.history}))
-        const search = this.url.Get(`search`) || ``
-        this.setState({ loading: false, rows, search })
+        this.setState({ loading: false, rows })
         for (const connector of rows) {
             await this.fetchConnector(connector)
         }
@@ -137,15 +135,13 @@ export class Connectors extends React.Component<RouteComponentProps, State> {
                 <KafkaToolbar
                     title="Connectors"
                     url={this.url}
-                    searchText={this.state.search}
-                    onSearch={e => this.setState({ search: e.target.value })}
-                    OnThemeChanged={ _ => this.refreshGrid()}>
+                    OnThemeChanged={ _ => this.refreshGrid()}
+                >
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
                 <ErrorMsg error={this.state.error} prefix="Failed to fetch connectors. Error: "></ErrorMsg>
                 {!this.state.loading && <DataView
-                    searchQuery={this.state.search}
-                    search={r => r.host.includes(this.state.search)}
+                    search={(r: Connector) => `${r.name},${r.state},${r.type},${r.workerId}`}
                     rows={this.state.rows}
                     raw={this.state.rows}
                     url={this.url}

@@ -10,7 +10,6 @@ import { GetTopicConfigsResult } from "../../shared/api";
 import { ConfigEntries } from "kafkajs";
 
 type State = {
-    search: string;
     loading: boolean;
     error?: string;
     rows: ConfigEntries[];
@@ -29,7 +28,7 @@ const TopicConfigLink: React.FunctionComponent<TopicConfigLinkProps> = (props) =
 }
 
 export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: string }>, State> {
-    state: State = { search: "", loading: true, rows: [], data: undefined, error: "" }
+    state: State = { loading: true, rows: [], data: undefined, error: "" }
     url: Url;
 
     constructor(props: RouteComponentProps<{ topic: string }>) {
@@ -45,8 +44,7 @@ export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: s
             return
         }
         const results = data.resources[0].configEntries
-        const search = this.url.Get(`search`) || ``
-        this.setState({ data, loading: false, rows: results, search })
+        this.setState({ data, loading: false, rows: results })
     }
 
     getColumnDefs() {
@@ -65,15 +63,12 @@ export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: s
                 <KafkaToolbar
                     title={`Configs for topic: ${this.props.match.params.topic}`}
                     url={this.url}
-                    searchText={this.state.search}
-                    onSearch={e => this.setState({ search: e.target.value })}
                 >
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
                 <ErrorMsg error={this.state.error} prefix="Failed to fetch configs. Error: "></ErrorMsg>
                 {!this.state.loading && <DataView
-                    searchQuery={this.state.search}
-                    search={r => r.configName.includes(this.state.search)}
+                    search={(r: ConfigEntries) => r.configName}
                     rows={this.state.rows}
                     raw={this.state.data?.resources ?? []}
                     url={this.url}

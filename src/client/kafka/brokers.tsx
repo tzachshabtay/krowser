@@ -8,14 +8,13 @@ import { Url } from "../common/url";
 import { Broker, GetClusterResult } from "../../shared/api";
 
 type State = {
-    search: string;
     loading: boolean;
     error?: string;
     rows: Broker[];
 }
 
 export class Brokers extends React.Component<RouteComponentProps, State> {
-    state: State = { loading: true, rows: [], search: "", error: "" }
+    state: State = { loading: true, rows: [], error: "" }
     url: Url;
 
     constructor(props: RouteComponentProps) {
@@ -31,8 +30,7 @@ export class Brokers extends React.Component<RouteComponentProps, State> {
             return
         }
         const rows = data.brokers
-        const search = this.url.Get(`search`) || ``
-        this.setState({ loading: false, rows, search })
+        this.setState({ loading: false, rows })
     }
 
     getColumnDefs() {
@@ -49,14 +47,12 @@ export class Brokers extends React.Component<RouteComponentProps, State> {
                 <KafkaToolbar
                     title="Brokers"
                     url={this.url}
-                    searchText={this.state.search}
-                    onSearch={e => this.setState({ search: e.target.value })}>
+                >
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
                 <ErrorMsg error={this.state.error} prefix="Failed to fetch brokers. Error: "></ErrorMsg>
                 {!this.state.loading && <DataView
-                    searchQuery={this.state.search}
-                    search={r => r.host.includes(this.state.search)}
+                    search={(r: Broker) => r.host}
                     rows={this.state.rows}
                     raw={this.state.rows}
                     url={this.url}

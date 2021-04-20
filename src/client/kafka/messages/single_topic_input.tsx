@@ -15,7 +15,6 @@ interface Props {
     limit?: number;
     fromTime?: string;
     toTime?: string;
-    search: string;
     searchBy: SearchBy;
     url: Url;
     onDataFetched: (data: FetchData) => void;
@@ -133,7 +132,6 @@ export class SingleTopicInput extends React.Component<Props, State> {
                 limit={this.props.limit}
                 fromTime={this.props.fromTime}
                 toTime={this.props.toTime}
-                search={this.props.search}
                 searchBy={this.props.searchBy}
                 onDataFetched={this.props.onDataFetched}
                 onDataFetchStarted={() => { this.setState({loadingMessages: true}); this.props.onDataFetchStarted} }

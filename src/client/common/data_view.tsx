@@ -5,11 +5,8 @@ import Tab from '@material-ui/core/Tab';
 import Typography from '@material-ui/core/Typography';
 import Box from '@material-ui/core/Box';
 import { CardView, CardViewProps } from "./card_view";
-import { Url } from "./url";
 
-interface DataViewProps extends GridProps, CardViewProps {
-    url: Url;
-}
+interface DataViewProps extends GridProps, CardViewProps {}
 
 interface State {
     value: number;

@@ -8,7 +8,6 @@ import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
 
 type State = {
-    search: string;
     loading: boolean;
     error: any;
     rows: any[];
@@ -21,7 +20,7 @@ class ViewMembersButton extends React.Component<CellProps, {}> {
 }
 
 export class Groups extends React.Component<RouteComponentProps, State> {
-    state: State = { loading: true, rows: [], search: "", error: "" }
+    state: State = { loading: true, rows: [], error: "" }
     url: Url;
 
     constructor(props: RouteComponentProps) {
@@ -39,8 +38,7 @@ export class Groups extends React.Component<RouteComponentProps, State> {
         const results = data.groups.map((r: any) => {
             return { numMembers: r.members.length, raw: r, history: this.props.history, ...r }
         })
-        const search = this.url.Get(`search`) || ``
-        this.setState({ loading: false, rows: results, search })
+        this.setState({ loading: false, rows: results })
     }
 
     getColumnDefs() {
@@ -59,14 +57,12 @@ export class Groups extends React.Component<RouteComponentProps, State> {
                 <KafkaToolbar
                     title="Groups"
                     url={this.url}
-                    searchText={this.state.search}
-                    onSearch={e => this.setState({ search: e.target.value })}>
+                >
                 </KafkaToolbar>
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
                 <ErrorMsg error={this.state.error} prefix="Failed to fetch groups. Error: "></ErrorMsg>
                 {!this.state.loading && <DataView
-                    searchQuery={this.state.search}
-                    search={r => r.groupId.includes(this.state.search) || r.protocol.includes(this.state.search) || r.protocolType.includes(this.state.search)}
+                    search={r => `${r.groupId},${r.protocol},${r.protocolType}`}
                     rows={this.state.rows}
                     raw={this.state.rows.map(r => r.raw)}
                     url={this.url}

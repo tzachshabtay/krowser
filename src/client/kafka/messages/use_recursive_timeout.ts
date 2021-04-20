@@ -39,7 +39,7 @@ function useRecursiveTimeout<T>(
                         return
                     }
                     if (savedDelay.current !== null) {
-                        id = setTimeout(tick, savedDelay.current);
+                        id = global.setTimeout(tick, savedDelay.current);
                     }
                 });
             } else {
@@ -47,12 +47,12 @@ function useRecursiveTimeout<T>(
                     return
                 }
                 if (savedDelay.current !== null) {
-                    id = setTimeout(tick, savedDelay.current);
+                    id = global.setTimeout(tick, savedDelay.current);
                 }
             }
         }
         if (savedDelay.current !== null) {
-            id = setTimeout(tick, savedDelay.current);
+            id = global.setTimeout(tick, savedDelay.current);
             return () => id && clearTimeout(id);
         }
     }, [delay]);
