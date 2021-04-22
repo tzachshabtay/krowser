@@ -9,6 +9,7 @@ import Box from '@material-ui/core/Box';
 import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
 import { GetTopicConsumerGroupsResult } from "../../shared/api";
+import { CancelToken, Loader } from "../common/loader";
 
 type State = {
     loading: boolean;
@@ -50,6 +51,7 @@ type Group = {
 export class TopicGroups extends React.Component<RouteComponentProps<{ topic: string }>, State> {
     state: State = { loading: true, rows: [], data: [], error: "" }
     url: Url;
+    loader: Loader = new Loader()
 
     constructor(props: RouteComponentProps<{ topic: string }>) {
         super(props);
@@ -57,8 +59,16 @@ export class TopicGroups extends React.Component<RouteComponentProps<{ topic: st
     }
 
     async componentDidMount() {
-        const response = await fetch(`/api/topic/${this.props.match.params.topic}/consumer_groups`)
-        const data: GetTopicConsumerGroupsResult = await response.json()
+        await this.loader.Load(this.fetchGroups)
+    }
+
+    componentWillUnmount() {
+        this.loader.Abort()
+    }
+
+    fetchGroups = async(cancelToken: CancelToken) => {
+        const data: GetTopicConsumerGroupsResult = await cancelToken.Fetch(`/api/topic/${this.props.match.params.topic}/consumer_groups`)
+        if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({loading: false, error: data.error })
             return

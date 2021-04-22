@@ -9,6 +9,7 @@ import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
 import { GetSubjectsResult, GetSubjectVersionsResult } from "../../shared/api";
 import { History } from 'history';
+import { CancelToken, Loader } from "../common/loader";
 
 type State = {
     loading: boolean;
@@ -35,6 +36,7 @@ export class Subjects extends React.Component<RouteComponentProps, State> {
     gridApi: GridApi | null = null;
     columnApi: ColumnApi | null = null;
     url: Url;
+    loader: Loader = new Loader()
 
     constructor(props: RouteComponentProps) {
         super(props);
@@ -47,8 +49,16 @@ export class Subjects extends React.Component<RouteComponentProps, State> {
     }
 
     async componentDidMount() {
-        const response = await fetch(`/api/schema-registry/subjects`)
-        const data: GetSubjectsResult = await response.json()
+        await this.loader.Load(this.fetchSubjects)
+    }
+
+    componentWillUnmount() {
+        this.loader.Abort()
+    }
+
+    fetchSubjects = async (cancelToken: CancelToken) => {
+        const data: GetSubjectsResult = await cancelToken.Fetch(`/api/schema-registry/subjects`)
+        if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({ loading: false, error: data.error, errorPrefix: "Failed to fetch subjects. Error: "})
             return
@@ -57,13 +67,14 @@ export class Subjects extends React.Component<RouteComponentProps, State> {
             { subject: r, history: this.props.history }))
         this.setState({ loading: false, rows: results })
         for (const subject of results) {
-            await this.fetchSubject(subject)
+            await this.fetchSubject(subject, cancelToken)
+            if (cancelToken.Aborted) return
         }
     }
 
-    async fetchSubject(subject: Subject) {
-        const response = await fetch(`/api/schema-registry/versions/${subject.subject}`)
-        const data: GetSubjectVersionsResult = await response.json()
+    async fetchSubject(subject: Subject, cancelToken: CancelToken) {
+        const data: GetSubjectVersionsResult = await cancelToken.Fetch(`/api/schema-registry/versions/${subject.subject}`)
+        if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({ loading: false, error: data.error, errorPrefix: `Failed to fetch subject ${subject.subject}. Error: `})
             return

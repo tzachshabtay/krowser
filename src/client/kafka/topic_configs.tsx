@@ -8,6 +8,7 @@ import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
 import { GetTopicConfigsResult } from "../../shared/api";
 import { ConfigEntries } from "kafkajs";
+import { CancelToken, Loader } from "../common/loader";
 
 type State = {
     loading: boolean;
@@ -30,6 +31,7 @@ const TopicConfigLink: React.FunctionComponent<TopicConfigLinkProps> = (props) =
 export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: string }>, State> {
     state: State = { loading: true, rows: [], data: undefined, error: "" }
     url: Url;
+    loader: Loader = new Loader()
 
     constructor(props: RouteComponentProps<{ topic: string }>) {
         super(props);
@@ -37,8 +39,16 @@ export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: s
     }
 
     async componentDidMount() {
-        const response = await fetch(`/api/topic/${this.props.match.params.topic}/config`)
-        const data: GetTopicConfigsResult = await response.json()
+        await this.loader.Load(this.fetchConfigs)
+    }
+
+    componentWillUnmount() {
+        this.loader.Abort()
+    }
+
+    fetchConfigs = async(cancelToken: CancelToken) => {
+        const data: GetTopicConfigsResult = await cancelToken.Fetch(`/api/topic/${this.props.match.params.topic}/config`)
+        if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({loading: false, error: data.error })
             return

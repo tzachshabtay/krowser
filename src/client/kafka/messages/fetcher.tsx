@@ -14,6 +14,7 @@ import { SearchStyle } from '../../../shared/search';
 import Box from '@material-ui/core/Box';
 import Typography from '@material-ui/core/Typography';
 import { GetTopicMessagesResult, GetTopicOffsetsByTimestapResult, GetTopicOffsetsResult, TopicOffsets } from "../../../shared/api";
+import { CancelToken, Loader } from "../../common/loader";
 
 export type SearchBy = "offset" | "time" | "newest" | "oldest";
 
@@ -57,8 +58,6 @@ type State = {
     fromTime: string;
     toTime: string;
     progress: Progress;
-    isCanceled: boolean;
-    abortController: AbortController | null;
 }
 
 export type FetchData = GetTopicMessagesResult | null;
@@ -128,21 +127,43 @@ export class Fetcher extends React.Component<Props, State> {
             partition: "",
             topic: "",
         },
-        isCanceled: false,
-        abortController: null,
     }
+    loader: Loader = new Loader()
 
     setStateAsync = (updater: any) => new Promise((resolve: any)=> this.setState(updater, resolve))
 
     async componentDidMount() {
         this.updateUrl()
-        await this.updateSearch()
-        this.props.url.Subscribe(this.onUrlChanged)
-        await this.fetchMessages(10000)
+        await this.fetchData(this.preloadMessages)
     }
 
     componentWillUnmount() {
         this.props.url.Unsubscribe(this.onUrlChanged)
+        this.loader.Abort()
+    }
+
+    fetchData = async (fn: (cancelToken: CancelToken) => Promise<void>) => {
+        try {
+            this.props.onDataFetchStarted(this.props.partition)
+            await this.loader.Load(fn)
+        } finally {
+            this.props.onDataFetchCompleted()
+        }
+    }
+
+    preloadMessages = async (cancelToken: CancelToken) => {
+        await this.updateSearch()
+        if (cancelToken.Aborted) return
+        this.props.url.Subscribe(this.onUrlChanged)
+        await this.fetchMessages(10000, cancelToken)
+    }
+
+    onFetchMessagesClicked = async () => {
+        await this.fetchData(this.loadMessages)
+    }
+
+    loadMessages = async (cancelToken: CancelToken) => {
+        await this.fetchMessages(20000, cancelToken)
     }
 
     async updateSearch() {
@@ -155,10 +176,12 @@ export class Fetcher extends React.Component<Props, State> {
         this.updateSearch()
     }
 
-    getOffsetForTime = async (topic: string, partition: number, time: string): Promise<number | undefined> => {
+    getOffsetForTime = async (topic: string, partition: number, time: string, cancelToken: CancelToken): Promise<number | undefined> => {
         const millis = new Date(time).getTime();
-        const response = await fetch(`/api/offsets/${topic}/${millis}`)
-        const data: GetTopicOffsetsByTimestapResult = await response.json()
+        const data: GetTopicOffsetsByTimestapResult = await cancelToken.Fetch(`/api/offsets/${topic}/${millis}`)
+        if (cancelToken.Aborted) {
+            return undefined
+        }
         if (data.error) {
             this.props.onError(data.error)
             return undefined
@@ -167,20 +190,18 @@ export class Fetcher extends React.Component<Props, State> {
         return result
     }
 
-    onFetchMessagesClicked = async () => {
-        await this.fetchMessages(20000)
-    }
-
-    getSelectedPartitions = async(topic: string): Promise<number[]> => {
+    getSelectedPartitions = async(topic: string, cancelToken: CancelToken): Promise<number[]> => {
         if (this.props.partition !== AllPartitions) {
             return [parseInt(this.props.partition)]
         }
-        return await this.getAllPartitionsForTopic(topic)
+        return await this.getAllPartitionsForTopic(topic, cancelToken)
     }
 
-    getAllPartitionsForTopic = async(topic: string): Promise<number[]> => {
-        const response = await fetch(`/api/topic/${topic}/offsets`)
-        const data: GetTopicOffsetsResult = await response.json()
+    getAllPartitionsForTopic = async(topic: string, cancelToken: CancelToken): Promise<number[]> => {
+        const data: GetTopicOffsetsResult = await cancelToken.Fetch(`/api/topic/${topic}/offsets`)
+        if (cancelToken.Aborted) {
+            return []
+        }
         if (data.error) {
             this.props.onError(data.error)
             return []
@@ -188,39 +209,41 @@ export class Fetcher extends React.Component<Props, State> {
         return data.offsets.map((r: TopicOffsets) => r.partition)
     }
 
-    fetchOldest = async (timeout: number) => {
+    fetchOldest = async (timeout: number, cancelToken: CancelToken) => {
         let out: FetchData = null
         for (const topic of this.props.topics) {
-            const partitions = await this.getSelectedPartitions(topic)
+            const partitions = await this.getSelectedPartitions(topic, cancelToken)
             for (const partition of partitions) {
-                const offsets = await this.getPartitionOffsets(topic, partition)
+                const offsets = await this.getPartitionOffsets(topic, partition, cancelToken)
                 if (offsets === undefined) {
                     return
                 }
                 await this.setStateAsync({offset: parseInt(offsets.low)})
-                out = await this.fetchMessagesForPartition(topic, timeout, partition, out)
+                out = await this.fetchMessagesForPartition(topic, timeout, partition, out, cancelToken)
             }
         }
     }
 
-    fetchNewest = async (timeout: number) => {
+    fetchNewest = async (timeout: number, cancelToken: CancelToken) => {
         let out: FetchData = null
         for (const topic of this.props.topics) {
-            const partitions = await this.getSelectedPartitions(topic)
+            const partitions = await this.getSelectedPartitions(topic, cancelToken)
             for (const partition of partitions) {
-                const offsets = await this.getPartitionOffsets(topic, partition)
+                const offsets = await this.getPartitionOffsets(topic, partition, cancelToken)
                 if (offsets === undefined) {
                     return
                 }
                 await this.setStateAsync({offset: parseInt(offsets.high) - this.state.limit})
-                out = await this.fetchMessagesForPartition(topic, timeout, partition, out)
+                out = await this.fetchMessagesForPartition(topic, timeout, partition, out, cancelToken)
             }
         }
     }
 
-    getPartitionOffsets = async (topic: string, partition: number) => {
-        const response = await fetch(`/api/topic/${topic}/offsets`)
-        const data: GetTopicOffsetsResult = await response.json()
+    getPartitionOffsets = async (topic: string, partition: number, cancelToken: CancelToken) => {
+        const data: GetTopicOffsetsResult = await cancelToken.Fetch(`/api/topic/${topic}/offsets`)
+        if (cancelToken.Aborted) {
+            return undefined
+        }
         if (data.error) {
             this.props.onError(data.error)
             return undefined
@@ -228,37 +251,37 @@ export class Fetcher extends React.Component<Props, State> {
         return data.offsets.find((el: TopicOffsets) => el.partition === partition)
     }
 
-    fetchByTime = async (timeout: number) => {
+    fetchByTime = async (timeout: number, cancelToken: CancelToken) => {
         let out: FetchData = null
         for (const topic of this.props.topics) {
-            const partitions = await this.getSelectedPartitions(topic)
+            const partitions = await this.getSelectedPartitions(topic, cancelToken)
             for (const partition of partitions) {
-                const fromOffset = await this.getOffsetForTime(topic, partition, this.state.fromTime)
+                const fromOffset = await this.getOffsetForTime(topic, partition, this.state.fromTime, cancelToken)
                 if (fromOffset === undefined) {
                     return
                 }
-                const toOffset = await this.getOffsetForTime(topic, partition, this.state.toTime)
+                const toOffset = await this.getOffsetForTime(topic, partition, this.state.toTime, cancelToken)
                 if (toOffset === undefined) {
                     return
                 }
                 const limit = toOffset - fromOffset
                 await this.setStateAsync({offset: fromOffset, limit})
-                out = await this.fetchMessagesForPartition(topic, timeout, partition, out)
+                out = await this.fetchMessagesForPartition(topic, timeout, partition, out, cancelToken)
             }
         }
     }
 
-    fetchByOffsets = async (timeout: number) => {
+    fetchByOffsets = async (timeout: number, cancelToken: CancelToken) => {
         let out: FetchData = null
         for (const topic of this.props.topics) {
-            const partitions = await this.getSelectedPartitions(topic)
+            const partitions = await this.getSelectedPartitions(topic, cancelToken)
             for (const partition of partitions) {
-                out = await this.fetchMessagesForPartition(topic, timeout, partition, out)
+                out = await this.fetchMessagesForPartition(topic, timeout, partition, out, cancelToken)
             }
         }
     }
 
-    fetchMessages = async (timeout: number) => {
+    fetchMessages = async (timeout: number, cancelToken: CancelToken) => {
         this.setState({ progress: {
             min: 0,
             max: 0,
@@ -267,32 +290,26 @@ export class Fetcher extends React.Component<Props, State> {
             partition: "",
             topic: "",
         }})
-        try {
-            this.props.onDataFetchStarted(this.props.partition)
-            switch (this.state.searchBy) {
-                case `offset`:
-                    await this.fetchByOffsets(timeout)
-                    break
-                case `time`:
-                    await this.fetchByTime(timeout)
-                    break
-                case `oldest`:
-                    await this.fetchOldest(timeout)
-                    break
-                case `newest`:
-                    await this.fetchNewest(timeout)
-                    break
-                default:
-                    this.props.onError(`Unsupported search by ${this.state.searchBy}`)
-                    break
-            }
-        }
-        finally {
-            this.props.onDataFetchCompleted()
+        switch (this.state.searchBy) {
+            case `offset`:
+                await this.fetchByOffsets(timeout, cancelToken)
+                break
+            case `time`:
+                await this.fetchByTime(timeout, cancelToken)
+                break
+            case `oldest`:
+                await this.fetchOldest(timeout, cancelToken)
+                break
+            case `newest`:
+                await this.fetchNewest(timeout, cancelToken)
+                break
+            default:
+                this.props.onError(`Unsupported search by ${this.state.searchBy}`)
+                break
         }
     }
 
-    fetchMessagesForPartition = async (topic: string, timeout: number, partition: number, out: FetchData): Promise<FetchData> => {
+    fetchMessagesForPartition = async (topic: string, timeout: number, partition: number, out: FetchData, cancelToken: CancelToken): Promise<FetchData> => {
         let cursor = this.state.offset
         if (cursor === undefined) {
             return null
@@ -307,7 +324,7 @@ export class Fetcher extends React.Component<Props, State> {
         }
         const min = cursor
         while (cursor < max) {
-            if (this.state.isCanceled) {
+            if (cancelToken.Aborted) {
                 break
             }
             const to = Math.min(max, cursor + limit)
@@ -319,18 +336,13 @@ export class Fetcher extends React.Component<Props, State> {
                 partition: this.props.partition === AllPartitions ? `Partition ${partition}: ` : "",
                 topic: this.props.topics.length > 1 ? `Topic ${topic}, ` : "",
             }})
-            const response = await fetch(
+            const data: GetTopicMessagesResult = await cancelToken.Fetch(
                 `/api/messages/${topic}/${partition}?limit=${limit}&offset=${cursor}&search=${encodeURIComponent(this.state.search)}&search_style=${this.state.searchStyle}&timeout=${timeout}`,
-                {signal: this.state.abortController?.signal}
             )
-            if (this.state.isCanceled) {
+            if (cancelToken.Aborted) {
                 break
             }
             cursor += limit
-            const data: GetTopicMessagesResult = await response.json()
-            if (this.state.isCanceled) {
-                break
-            }
             if (!out) {
                 out = data
             } else if (data.messages) {
@@ -422,25 +434,8 @@ export class Fetcher extends React.Component<Props, State> {
                 </>}
                 </div>
                 <GoButton
-                    onRun={() => {
-                        return new Promise((resolve, reject) => {
-                            this.setState({isCanceled: false, abortController: new AbortController()},
-                            async () => {
-                                try {
-                                    await this.onFetchMessagesClicked()
-                                    resolve()
-                                } catch (error) {
-                                    if (error.name === 'AbortError') {
-                                        this.props.onDataFetchCompleted()
-                                        resolve()
-                                    } else {
-                                        reject(error)
-                                    }
-                                }
-                            })
-                        })
-                    }}
-                    onCancel={() => this.setState({isCanceled: true}, () => this.state.abortController?.abort())}
+                    onRun={this.onFetchMessagesClicked}
+                    onCancel={() => this.loader.Abort() }
                     isRunning={this.props.loadingMessages}>
                 </GoButton>
             </Toolbar>

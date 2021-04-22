@@ -8,6 +8,7 @@ import { Url } from "../common/url";
 import { ConnectorConfig, ConnectorState, GetConnectorTasksResult, GetConnectorTaskStatusResult } from "../../shared/api";
 import { ColDef, GridApi, GridReadyEvent } from "ag-grid-community";
 import { ReplaceDots } from "./connectors";
+import { CancelToken, Loader } from "../common/loader";
 
 type State = {
     loading: boolean;
@@ -27,6 +28,7 @@ export class Tasks extends React.Component<RouteComponentProps<{ connector: stri
     state: State = { loading: true, customCols: {cols: {}}, rows: [], error: "" }
     gridApi: GridApi | null = null;
     url: Url;
+    loader: Loader = new Loader()
 
     constructor(props: RouteComponentProps<{ connector: string }>) {
         super(props);
@@ -38,8 +40,16 @@ export class Tasks extends React.Component<RouteComponentProps<{ connector: stri
     }
 
     async componentDidMount() {
-        const response = await fetch(`/api/kafka-connect/connector/${this.props.match.params.connector}/tasks`)
-        const data: GetConnectorTasksResult = await response.json()
+        await this.loader.Load(this.fetchTasks)
+    }
+
+    componentWillUnmount() {
+        this.loader.Abort()
+    }
+
+    fetchTasks = async (cancelToken: CancelToken) => {
+        const data: GetConnectorTasksResult = await cancelToken.Fetch(`/api/kafka-connect/connector/${this.props.match.params.connector}/tasks`)
+        if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({loading: false, error: data.error})
             return
@@ -52,13 +62,14 @@ export class Tasks extends React.Component<RouteComponentProps<{ connector: stri
         }
         this.setState({ loading: false, rows })
         for (const c of rows) {
-            await this.fetchTaskStatus(c)
+            await this.fetchTaskStatus(c, cancelToken)
+            if (cancelToken.Aborted) return
         }
     }
 
-    async fetchTaskStatus(task: Task) {
-        const response = await fetch(`/api/kafka-connect/connector/${this.props.match.params.connector}/tasks/${task.id}/status`)
-        const data: GetConnectorTaskStatusResult = await response.json()
+    async fetchTaskStatus(task: Task, cancelToken: CancelToken) {
+        const data: GetConnectorTaskStatusResult = await cancelToken.Fetch(`/api/kafka-connect/connector/${this.props.match.params.connector}/tasks/${task.id}/status`)
+        if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({loading: false, error: data.error})
             return

@@ -8,6 +8,7 @@ import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
 import { GetSchemaResult, GetSubjectVersionsResult } from "../../shared/api";
 import { Schema } from "avsc";
+import { CancelToken, Loader } from "../common/loader";
 
 
 type State = {
@@ -56,6 +57,7 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
     gridApi: GridApi | null = null;
     columnApi: ColumnApi | null = null;
     url: Url;
+    loader: Loader = new Loader()
 
     constructor(props: RouteComponentProps<{ subject: string }>) {
         super(props);
@@ -68,8 +70,16 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
     }
 
     async componentDidMount() {
-        const response = await fetch(`/api/schema-registry/versions/${this.props.match.params.subject}`)
-        const data: GetSubjectVersionsResult = await response.json()
+        await this.loader.Load(this.fetchVersions)
+    }
+
+    componentWillUnmount() {
+        this.loader.Abort()
+    }
+
+    fetchVersions = async (cancelToken: CancelToken) => {
+        const data: GetSubjectVersionsResult = await cancelToken.Fetch(`/api/schema-registry/versions/${this.props.match.params.subject}`)
+        if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({loading: false, error: data.error, errorPrefix: "Failed to fetch versions. Error: "})
             return
@@ -79,14 +89,15 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
         this.setState({ loading: false, rows: results })
         const customCols = {cols: {}}
         for (const version of results) {
-            await this.fetchSchema(version, customCols)
+            await this.fetchSchema(version, customCols, cancelToken)
+            if (cancelToken.Aborted) return
         }
         this.setState({customCols})
     }
 
-    async fetchSchema(version: Version, customCols: {cols: any}) {
-        const response = await fetch(`/api/schema-registry/schema/${this.props.match.params.subject}/${version.version}`)
-        const data: GetSchemaResult = await response.json()
+    async fetchSchema(version: Version, customCols: {cols: any}, cancelToken: CancelToken) {
+        const data: GetSchemaResult = await cancelToken.Fetch(`/api/schema-registry/schema/${this.props.match.params.subject}/${version.version}`)
+        if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({loading: false, error: data.error, errorPrefix: `Failed to fetch schema for version ${version.version}. Error: `})
             return
