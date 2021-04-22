@@ -5,6 +5,7 @@ import { KafkaToolbar} from '../common/toolbar';
 import { DataView} from '../common/data_view';
 import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
+import { CancelToken, Loader } from "../common/loader";
 
 type State = {
     loading: boolean;
@@ -15,6 +16,7 @@ type State = {
 export class Members extends React.Component<RouteComponentProps<{ group: string }>, State> {
     state: State = { loading: true, rows: [], error: "" }
     url: Url;
+    loader: Loader = new Loader()
 
     constructor(props: RouteComponentProps<{ group: string }>) {
         super(props);
@@ -22,8 +24,16 @@ export class Members extends React.Component<RouteComponentProps<{ group: string
     }
 
     async componentDidMount() {
-        const response = await fetch(`/api/members/${this.props.match.params.group}`)
-        const data = await response.json()
+        await this.loader.Load(this.fetchMembers)
+    }
+
+    componentWillUnmount() {
+        this.loader.Abort()
+    }
+
+    fetchMembers = async (cancelToken: CancelToken) => {
+        const data = await cancelToken.Fetch(`/api/members/${this.props.match.params.group}`)
+        if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({loading: false, error: data.error })
             return

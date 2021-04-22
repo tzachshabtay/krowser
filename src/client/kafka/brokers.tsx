@@ -6,6 +6,7 @@ import { DataView} from '../common/data_view';
 import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
 import { Broker, GetClusterResult } from "../../shared/api";
+import { CancelToken, Loader } from "../common/loader";
 
 type State = {
     loading: boolean;
@@ -16,6 +17,7 @@ type State = {
 export class Brokers extends React.Component<RouteComponentProps, State> {
     state: State = { loading: true, rows: [], error: "" }
     url: Url;
+    loader: Loader = new Loader()
 
     constructor(props: RouteComponentProps) {
         super(props);
@@ -23,8 +25,16 @@ export class Brokers extends React.Component<RouteComponentProps, State> {
     }
 
     async componentDidMount() {
-        const response = await fetch(`/api/cluster`)
-        const data: GetClusterResult = await response.json()
+        await this.loader.Load(this.fetchBrokers)
+    }
+
+    componentWillUnmount() {
+        this.loader.Abort()
+    }
+
+    fetchBrokers = async (cancelToken: CancelToken) => {
+        const data: GetClusterResult = await cancelToken.Fetch(`/api/cluster`)
+        if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({loading: false, error: data.error})
             return

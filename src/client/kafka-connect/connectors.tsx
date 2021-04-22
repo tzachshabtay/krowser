@@ -9,6 +9,7 @@ import { ConnectorConfig, ConnectorState, GetConnectorConfigResult, GetConnector
 import { CellButton, CellProps } from "../common/cell_button";
 import { ColDef, GridApi, GridReadyEvent } from "ag-grid-community";
 import { History } from 'history';
+import { CancelToken, Loader } from "../common/loader";
 
 type State = {
     loading: boolean;
@@ -46,6 +47,7 @@ export class Connectors extends React.Component<RouteComponentProps, State> {
     state: State = { loading: true, customCols: {cols: {}}, rows: [], error: "" }
     gridApi: GridApi | null = null;
     url: Url;
+    loader: Loader = new Loader()
 
     constructor(props: RouteComponentProps) {
         super(props);
@@ -57,8 +59,16 @@ export class Connectors extends React.Component<RouteComponentProps, State> {
     }
 
     async componentDidMount() {
-        const response = await fetch(`/api/kafka-connect/connectors`)
-        const data: GetConnectorsResult = await response.json()
+        await this.loader.Load(this.fetchConnectors)
+    }
+
+    componentWillUnmount() {
+        this.loader.Abort()
+    }
+
+    fetchConnectors = async (cancelToken: CancelToken) => {
+        const data: GetConnectorsResult = await cancelToken.Fetch(`/api/kafka-connect/connectors`)
+        if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({loading: false, error: data.error})
             return
@@ -66,18 +76,20 @@ export class Connectors extends React.Component<RouteComponentProps, State> {
         const rows: Connector[] = data.map(c => ({name: c, state: "Loading", workerId: "Loading", type: "Loading", history: this.props.history}))
         this.setState({ loading: false, rows })
         for (const connector of rows) {
-            await this.fetchConnector(connector)
+            await this.fetchConnector(connector, cancelToken)
         }
     }
 
-    async fetchConnector(connector: Connector) {
-        await this.fetchConnectorStatus(connector)
-        await this.fetchConnectorConfig(connector)
+    async fetchConnector(connector: Connector, cancelToken: CancelToken) {
+        await this.fetchConnectorStatus(connector, cancelToken)
+        if (cancelToken.Aborted) return
+        await this.fetchConnectorConfig(connector, cancelToken)
+        if (cancelToken.Aborted) return
     }
 
-    async fetchConnectorStatus(connector: Connector) {
-        const response = await fetch(`/api/kafka-connect/connector/${connector.name}/status`)
-        const data: GetConnectorStatusResult = await response.json()
+    async fetchConnectorStatus(connector: Connector, cancelToken: CancelToken) {
+        const data: GetConnectorStatusResult = await cancelToken.Fetch(`/api/kafka-connect/connector/${connector.name}/status`)
+        if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({loading: false, error: data.error})
             return
@@ -92,9 +104,9 @@ export class Connectors extends React.Component<RouteComponentProps, State> {
         this.forceUpdate();
     }
 
-    async fetchConnectorConfig(connector: Connector) {
-        const response = await fetch(`/api/kafka-connect/connector/${connector.name}/config`)
-        let data: GetConnectorConfigResult = await response.json()
+    async fetchConnectorConfig(connector: Connector, cancelToken: CancelToken) {
+        let data: GetConnectorConfigResult = await cancelToken.Fetch(`/api/kafka-connect/connector/${connector.name}/config`)
+        if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({loading: false, error: data.error})
             return

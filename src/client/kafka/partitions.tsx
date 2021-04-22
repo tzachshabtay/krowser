@@ -8,6 +8,7 @@ import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
 import { GetTopicResult, TopicOffsets } from "../../shared/api";
 import { History } from 'history';
+import { CancelToken, Loader } from "../common/loader";
 
 type State = {
     loading: boolean;
@@ -34,6 +35,7 @@ type Partition = {
 export class Partitions extends React.Component<RouteComponentProps<{ topic: string }>, State> {
     state: State = { loading: true, rows: [], error: "" }
     url: Url;
+    loader: Loader = new Loader()
 
     constructor(props: RouteComponentProps<{ topic: string }>) {
         super(props);
@@ -41,8 +43,16 @@ export class Partitions extends React.Component<RouteComponentProps<{ topic: str
     }
 
     async componentDidMount() {
-        const response = await fetch(`/api/topic/${this.props.match.params.topic}`)
-        const data: GetTopicResult = await response.json()
+        await this.loader.Load(this.fetchPartitions)
+    }
+
+    componentWillUnmount() {
+        this.loader.Abort()
+    }
+
+    fetchPartitions = async(cancelToken: CancelToken) => {
+        const data: GetTopicResult = await cancelToken.Fetch(`/api/topic/${this.props.match.params.topic}`)
+        if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({loading: false, error: data.error })
             return

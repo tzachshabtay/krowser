@@ -10,6 +10,7 @@ import { Url } from "../common/url";
 import { GetTopicResult, GetTopicsResult, TopicConsumerGroups, TopicOffsets, TopicsOffsets } from "../../shared/api";
 import { DescribeConfigResponse, ITopicMetadata } from "kafkajs";
 import { History } from 'history';
+import { CancelToken, Loader } from "../common/loader";
 
 type State = {
     loading: boolean;
@@ -60,6 +61,7 @@ export class Topics extends React.Component<RouteComponentProps, State> {
     gridApi: GridApi | null = null;
     columnApi: ColumnApi | null = null;
     url: Url;
+    loader: Loader = new Loader();
 
     constructor(props: RouteComponentProps) {
         super(props);
@@ -72,8 +74,16 @@ export class Topics extends React.Component<RouteComponentProps, State> {
     }
 
     async componentDidMount() {
-        const response = await fetch(`/api/topics`)
-        const data: GetTopicsResult = await response.json()
+        await this.loader.Load(this.fetchTopics)
+    }
+
+    componentWillUnmount() {
+        this.loader.Abort()
+    }
+
+    fetchTopics = async (cancelToken: CancelToken) => {
+        const data: GetTopicsResult = await cancelToken.Fetch(`/api/topics`)
+        if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({loading: false, error: data.error, errorPrefix: "Failed to fetch topics. Error: "})
             return
@@ -82,13 +92,14 @@ export class Topics extends React.Component<RouteComponentProps, State> {
             { topic: r.name, num_partitions: r.partitions.length, raw: r, history: this.props.history }))
         this.setState({ loading: false, rows: results })
         for (const topic of results) {
-            await this.fetchTopic(topic)
+            await this.fetchTopic(topic, cancelToken)
+            if (cancelToken.Aborted) return
         }
     }
 
-    async fetchTopic(topic: Topic) {
-        const response = await fetch(`/api/topic/${topic.topic}`)
-        const data: GetTopicResult = await response.json()
+    fetchTopic = async (topic: Topic, cancelToken: CancelToken) => {
+        const data: GetTopicResult = await cancelToken.Fetch(`/api/topic/${topic.topic}`)
+        if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({loading: false, error: data.error, errorPrefix: `Failed to fetch topic ${topic.topic}. Error: `})
             return

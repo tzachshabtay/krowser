@@ -6,6 +6,7 @@ import { KafkaToolbar} from '../common/toolbar';
 import { DataView} from '../common/data_view';
 import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
+import { CancelToken, Loader } from "../common/loader";
 
 type State = {
     loading: boolean;
@@ -22,6 +23,7 @@ class ViewMembersButton extends React.Component<CellProps, {}> {
 export class Groups extends React.Component<RouteComponentProps, State> {
     state: State = { loading: true, rows: [], error: "" }
     url: Url;
+    loader: Loader = new Loader()
 
     constructor(props: RouteComponentProps) {
         super(props);
@@ -29,8 +31,16 @@ export class Groups extends React.Component<RouteComponentProps, State> {
     }
 
     async componentDidMount() {
-        const response = await fetch(`/api/groups`)
-        const data = await response.json()
+        await this.loader.Load(this.fetchGroups)
+    }
+
+    componentWillUnmount() {
+        this.loader.Abort()
+    }
+
+    fetchGroups = async (cancelToken: CancelToken) => {
+        const data = await cancelToken.Fetch(`/api/groups`)
+        if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({loading: false, error: data.error})
             return
