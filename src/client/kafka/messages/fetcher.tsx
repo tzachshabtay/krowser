@@ -53,8 +53,8 @@ type State = {
     search: string;
     searchStyle: SearchStyle;
     searchBy: SearchBy;
-    offset: number;
-    limit: number;
+    offset: number | "";
+    limit: number | "";
     fromTime: string;
     toTime: string;
     progress: Progress;
@@ -64,12 +64,10 @@ export type FetchData = GetTopicMessagesResult | null;
 
 interface InputProps{
     label: string;
-    value: number;
+    value: number | "";
     onChange?: any;
     onEnter: () => {};
 }
-
-const enterKey = 13;
 
 const InputField: React.FunctionComponent<InputProps> = (props) => {
     return (
@@ -78,10 +76,14 @@ const InputField: React.FunctionComponent<InputProps> = (props) => {
             type="number"
             value={props.value}
             onChange={props.onChange}
-            onKeyDown={(e) => {if (e.keyCode === enterKey) props.onEnter()}}
+            onKeyDown={(e) => {
+                if (e.key === "Enter") props.onEnter()
+            }}
             margin="normal"
             inputProps={{ min: "0", step: "1" }}
             style={{ marginRight: 10, maxWidth: 100 }}
+            error={props.value === ""}
+            helperText={props.value === "" ? "Cannot be empty" : ""}
         />
     )
 }
@@ -100,7 +102,7 @@ const DateTimeField: React.FunctionComponent<DateTimeInputProps> = (props) => {
             type="datetime-local"
             value={props.value}
             onChange={props.onChange}
-            onKeyDown={(e) => {if (e.keyCode === enterKey) props.onEnter()}}
+            onKeyDown={(e) => {if (e.key === "Enter") props.onEnter()}}
             margin="normal"
             style={{ marginRight: 10, maxWidth: 300 }}
             InputLabelProps={{
@@ -225,6 +227,9 @@ export class Fetcher extends React.Component<Props, State> {
     }
 
     fetchNewest = async (timeout: number, cancelToken: CancelToken) => {
+        if (this.state.limit === "") {
+            return
+        }
         let out: FetchData = null
         for (const topic of this.props.topics) {
             const partitions = await this.getSelectedPartitions(topic, cancelToken)
@@ -311,7 +316,7 @@ export class Fetcher extends React.Component<Props, State> {
 
     fetchMessagesForPartition = async (topic: string, timeout: number, partition: number, out: FetchData, cancelToken: CancelToken): Promise<FetchData> => {
         let cursor = this.state.offset
-        if (cursor === undefined) {
+        if (cursor === undefined || cursor === "" || this.state.limit === "") {
             return null
         }
         const max = cursor + this.state.limit
@@ -407,14 +412,14 @@ export class Fetcher extends React.Component<Props, State> {
                 <InputField
                     label="Offset"
                     value={this.state.offset}
-                    onChange={(e: React.ChangeEvent<{ name?: string; value: unknown }>) => this.setState({ offset: parseInt(e.target.value as string) }, this.updateUrl)}
+                    onChange={(e: React.ChangeEvent<{ name?: string; value: unknown }>) => this.setState({ offset: e.target.value === "" ? "" : parseInt(e.target.value as string) }, this.updateUrl)}
                     onEnter={async () => { await this.onFetchMessagesClicked() }}
                 />}
                 {this.state.searchBy !== "time" &&
                 <InputField
                     label="Limit"
                     value={this.state.limit}
-                    onChange={(e: React.ChangeEvent<{ name?: string; value: unknown }>) => this.setState({ limit: parseInt(e.target.value as string) }, this.updateUrl)}
+                    onChange={(e: React.ChangeEvent<{ name?: string; value: unknown }>) => this.setState({ limit: e.target.value === "" ? "" : parseInt(e.target.value as string) }, this.updateUrl)}
                     onEnter={async () => { await this.onFetchMessagesClicked() }}
                 />}
                 {this.state.searchBy === "time" &&
