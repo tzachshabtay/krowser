@@ -230,7 +230,6 @@ export class Messages extends React.Component<Props, State> {
                     </SingleTopicInput>
                 )}
                 { this.state.warning && (<Alert severity="warning">{this.state.warning}</Alert>)}
-                { this.state.error && (<Alert severity="error">{this.state.error}</Alert>)}
                 <ErrorMsg error={this.state.error} prefix="Failed to fetch data. Error: "></ErrorMsg>
                 <DataView
                     search={r => `${r.rowValue},${r.rowKey},${r.rowType}`}

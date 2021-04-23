@@ -33,8 +33,30 @@ export class CancelToken {
     }
 
     public async Fetch(url: string): Promise<any> {
-        const response = await fetch(url, { signal: this.Signal })
-        if (this.Aborted) return null
-        return await response.json()
+        try {
+            const response = await fetch(url, { signal: this.Signal })
+            if (this.Aborted) return null
+            try {
+                const responseTxt = await response.text()
+                try {
+                    const body = JSON.parse(responseTxt)
+                    if(!body.error && response.status >= 400) {
+                        return { error: `fetch from ${url} returned status code ${response.status}, response: ${responseTxt}` }
+                    }
+                    return body
+                } catch (jsonErr) {
+                    if (this.Aborted) return null
+                    console.warn(`unable to parse response json:`, jsonErr)
+                    return { error: `fetch from ${url} returned status code ${response.status}, text: ${responseTxt}`}
+                }
+            } catch (txtErr) {
+                if (this.Aborted) return null
+                console.warn(`unable to parse response text:`, txtErr)
+                return { error: `fetch from ${url} returned status code ${response.status}`}
+            }
+        } catch (error) {
+            if (this.Aborted) return null
+            return { error: `fetch from ${url} errored: ${error}`}
+        }
     }
 }
