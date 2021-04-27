@@ -157,7 +157,11 @@ export class Fetcher extends React.Component<Props, State> {
         await this.updateSearch()
         if (cancelToken.Aborted) return
         this.props.url.Subscribe(this.onUrlChanged)
-        await this.fetchMessages(10000, cancelToken)
+        let timeout = 10000
+        if (this.state.limit && this.state.limit > 100) {
+            timeout = 20000
+        }
+        await this.fetchMessages(timeout, cancelToken)
     }
 
     onFetchMessagesClicked = async () => {
@@ -238,7 +242,11 @@ export class Fetcher extends React.Component<Props, State> {
                 if (offsets === undefined) {
                     return
                 }
-                await this.setStateAsync({offset: parseInt(offsets.high) - this.state.limit})
+                let offset = parseInt(offsets.high) - this.state.limit
+                if (offset < parseInt(offsets.low)) {
+                    offset = parseInt(offsets.low)
+                }
+                await this.setStateAsync({offset})
                 out = await this.fetchMessagesForPartition(topic, timeout, partition, out, cancelToken)
             }
         }
@@ -321,8 +329,8 @@ export class Fetcher extends React.Component<Props, State> {
         }
         const max = cursor + this.state.limit
         let limit = this.state.limit
-        if (limit > 1000) {
-            limit = 1000
+        if (limit > 10000) {
+            limit = 10000
         }
         if (cursor >= max) {
             this.props.onDataFetched(out)

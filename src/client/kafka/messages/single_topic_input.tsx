@@ -134,7 +134,7 @@ export class SingleTopicInput extends React.Component<Props, State> {
                 toTime={this.props.toTime}
                 searchBy={this.props.searchBy}
                 onDataFetched={this.props.onDataFetched}
-                onDataFetchStarted={() => { this.setState({loadingMessages: true}); this.props.onDataFetchStarted} }
+                onDataFetchStarted={() => { this.setState({loadingMessages: true}); this.props.onDataFetchStarted(this.state.partition)} }
                 onDataFetchCompleted={() => this.setState({loadingMessages: false})}
                 loadingMessages={this.state.loadingMessages}
                 error={this.state.error ?? ""}
