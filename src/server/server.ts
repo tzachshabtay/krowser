@@ -1,7 +1,8 @@
 import express from "express";
+const serverTiming = require('server-timing');
 import http from "http";
 import path from "path";
-import { Kafka, ResourceTypes, DescribeConfigResponse, Consumer, Admin, GroupDescriptions } from "kafkajs";
+import { Kafka, ConfigResourceTypes, DescribeConfigResponse, Consumer, Admin, GroupDescriptions, EachBatchPayload } from "kafkajs";
 import { SchemaRegistry, SchemaVersion } from '@ovotech/avro-kafkajs';
 import { Schema, Type } from "avsc";
 import { v4 as uuidv4 } from 'uuid';
@@ -10,7 +11,11 @@ import { GetTopicsResult, GetTopicResult, TopicsOffsets, ConsumerOffsets, TopicC
 import { SearchStyle, Includes } from "../shared/search";
 const fetch = require("node-fetch");
 
-type TopicQueryInput = { topic: string, partition: number, limit: number, offset: number, search: string, timeout?: number, searchStyle: SearchStyle}
+console.log(`KAFKA_URLS=${KAFKA_URLS}`)
+console.log(`SCHEMA_REGISTRY_URL=${SCHEMA_REGISTRY_URL}`)
+console.log(`KAFKA_CONNECT_URL=${KAFKA_CONNECT_URL}`)
+
+type TopicQueryInput = { topic: string, partition: number, limit: number, offset: number, search: string, timeout?: number, searchStyle: SearchStyle, trace: boolean}
 
 const schemaRegistry = new SchemaRegistry({ uri: SCHEMA_REGISTRY_URL });
 
@@ -43,6 +48,8 @@ class KafkaClient {
 const kafka = new KafkaClient();
 
 const app = express();
+
+app.use(serverTiming());
 
 app.set("view engine", "ejs");
 app.set("views", "public");
@@ -215,6 +222,7 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 		const search = req.query.search ? req.query.search as string : ""
 		const searchStyle = req.query.search_style ? req.query.search_style as SearchStyle : ""
 		const timeout = req.query.timeout ? parseInt(req.query.timeout.toString()) : 20000
+		const trace = req.query.trace === `true`
 		const partition = parseInt(req.params.partition)
 		const partitions = await withRetry("fetchTopicOffsets", () => kafka.Admin.fetchTopicOffsets(topic))
 		for (const partitionOffsets of partitions) {
@@ -233,7 +241,7 @@ app.get("/api/messages/:topic/:partition", async (req, res) => {
 				res.status(200).json({messages: []})
 				return
 			}
-			const messages: GetTopicMessagesResult = await getMessages({topic, partition, limit, offset, search, searchStyle, timeout})
+			const messages: GetTopicMessagesResult = await getMessages({topic, partition, limit, offset, search, searchStyle, timeout, trace}, res)
 			res.status(200).json(messages)
 			return
 		}
@@ -371,7 +379,7 @@ const getTopicConfig = async (topic: string): Promise<DescribeConfigResponse> =>
 		includeSynonyms: false,
 		resources: [
 			{
-			type: ResourceTypes.TOPIC,
+			type: ConfigResourceTypes.TOPIC,
 			name: topic
 			}
 		]
@@ -395,15 +403,26 @@ const getTopicConsumerGroups = async (topic: string): Promise<TopicConsumerGroup
 	return found
 }
 
-const getMessages = async (input: TopicQueryInput): Promise<TopicMessages> => {
-	const groupId = `krowser-${Date.now()}=${uuidv4()}`
-	const consumer = kafka.Kafka.consumer({ groupId })
+const endBatch = (res: any, batchIdx: number) => {
+	res.endTime(`batch_${batchIdx}`);
+	res.startTime(`time_to_batch${batchIdx+1}`, `time to batch ${batchIdx+1}`)
+}
+
+const getMessages = async (input: TopicQueryInput, res: any): Promise<TopicMessages> => {
+	const groupId = `krowser-${Date.now()}-${uuidv4()}`
+	res.startTime('connect_kafka', 'connect kafka');
+	const consumer = kafka.Kafka.consumer({ groupId, allowAutoTopicCreation: false })
 	await consumer.connect()
+	res.endTime('connect_kafka');
 
 	const messages: TopicMessage[] = []
 	let numConsumed = 0
+	let batchIdx = 0
+	const endOffset = input.offset + input.limit - 1
 	console.log(`Querying topic ${input.topic} (partition ${input.partition}) at offset=${input.offset}, limit=${input.limit}`)
-	consumer.subscribe({ topic: input.topic, fromBeginning: true })
+	res.startTime('subscribe', 'subscribe');
+	consumer.subscribe({ topic: input.topic, fromBeginning: false })
+	res.endTime('subscribe');
 	const consumed: Set<string> = new Set<string>()
 	let hasTimeout = false
 	const p = new Promise<void>(async (resolve, reject) => {
@@ -411,78 +430,129 @@ const getMessages = async (input: TopicQueryInput): Promise<TopicMessages> => {
 			hasTimeout = true
 			resolve()
 		}, input.timeout || 20000);
+		res.startTime(`time_to_batch${batchIdx+1}`, `time to batch ${batchIdx+1}`)
 		await consumer.run({
 			autoCommit: false,
-			eachMessage: async ({ topic, partition, message }) => {
-				if (partition !== input.partition) {
-					console.log(`ignoreing message from partition ${partition} (offset ${message.offset}), expecting partition ${input.partition}`)
+			eachBatchAutoResolve: true,
+			eachBatch: async (payload: EachBatchPayload) => {
+				batchIdx += 1
+				res.endTime(`time_to_batch${batchIdx}`)
+				if (payload.batch.partition !== input.partition) {
+					console.log(`Ignoring batch from partition ${payload.batch.partition}, expecting partition ${input.partition}`)
+					endBatch(res, batchIdx)
 					return
 				}
-				console.log(`---MESSAGE: ${message.offset}---`)
-				let schemaType : Type | undefined = undefined;
-				if (message.value === null) {
-					console.log(`Message value is null`)
-				} else {
-					try {
-						const { type, value } = await schemaRegistry.decodeWithType<any>(message.value);
-						message.value = value;
-						schemaType = type;
-					} catch (error) {
-						console.log(`Not an avro message? error: ${error}`);
+				if (payload.batch.topic !== input.topic) {
+					console.log(`Ignoring batch from a different topic: ${payload.batch.topic} (expecting ${input.topic})`)
+					endBatch(res, batchIdx)
+					return
+				}
+				const firstOffset = payload.batch.firstOffset()
+				if (firstOffset === null) {
+					console.log(`Ignoring batch with no first offset`)
+					endBatch(res, batchIdx)
+					return
+				}
+				const low = parseInt(firstOffset)
+				if (low > endOffset) {
+					console.log(`Ignoring batch with a too high offset ${low} (expecting ${input.offset}-${endOffset})`)
+					endBatch(res, batchIdx)
+					return
+				}
+				const lastOffset = payload.batch.lastOffset()
+				if (lastOffset === null) {
+					console.log(`Ignoring batch with no last offset`)
+					endBatch(res, batchIdx)
+					return
+				}
+				const high = parseInt(lastOffset)
+				if (high < input.offset) {
+					console.log(`Ignoring batch with a too low offset ${high} (expecting ${input.offset}-${endOffset})`)
+					endBatch(res, batchIdx)
+					return
+				}
+				console.log(`---Batch: ${payload.batch.firstOffset()} - ${payload.batch.lastOffset()} (len: ${payload.batch.messages.length})`)
+				res.startTime(`batch_${batchIdx}`, `batch ${batchIdx}`);
+				for (const message of payload.batch.messages) {
+					if (input.trace) {
+						console.log(`---MESSAGE: ${message.offset}---`)
+					}
+					let schemaType : Type | undefined = undefined;
+					if (message.value === null) {
+						console.log(`Message value is null`)
+					} else {
+						try {
+							const { type, value } = await schemaRegistry.decodeWithType<any>(message.value);
+							message.value = value;
+							schemaType = type;
+						} catch (error) {
+							if (input.trace) {
+								console.log(`Not an avro message? error: ${error}`);
+							}
+						}
+					}
+					const value = message.value ? message.value.toString() : "";
+					const key = message.key ? message.key.toString() : "";
+					if (input.trace) {
+						console.log({
+							partition: payload.batch.partition,
+							offset: message.offset,
+							value: value,
+							schemaType: schemaType,
+							key: key,
+						})
+					}
+
+					if (consumed.has(message.offset)) {
+						console.log(`Ignoring duplicate message from offset ${message.offset}`)
+						continue
+					}
+					consumed.add(message.offset)
+
+					const offset = parseInt(message.offset)
+					if (offset < input.offset) {
+						console.log(`Ignoring message from an old offset: ${offset} (expecting at least ${input.offset})`)
+						continue
+					}
+					numConsumed++
+					let filteredOut = false
+					if (input.search) {
+						const text: string = `${value},${key},${schemaType?.name ?? ""}`
+						if (!Includes(text, input.search, input.searchStyle)) {
+							filteredOut = true
+							if (input.trace) {
+								console.log(`Ignoring message from offset ${message.offset}, filtered out by search`)
+							}
+						}
+					}
+					if (!filteredOut) {
+						messages.push({ topic: payload.batch.topic, partition: payload.batch.partition, message, key, value, schemaType })
+					}
+					if (numConsumed >= input.limit || offset >= endOffset) {
+						break
 					}
 				}
-				const value = message.value ? message.value.toString() : "";
-				const key = message.key ? message.key.toString() : "";
-				console.log({
-					partition,
-					offset: message.offset,
-					value: value,
-					schemaType: schemaType,
-					key: key,
-				})
-
-				if (topic !== input.topic) {
-					console.log(`Ignoring message from a different topic: ${topic} (expecting ${input.topic})`)
-					return
-				}
-
-				if (consumed.has(message.offset)) {
-					console.log(`Ignoring duplicate message from offset ${message.offset}`)
-					return
-				}
-				consumed.add(message.offset)
-
-				const offset = parseInt(message.offset)
-				if (offset < input.offset) {
-					console.log(`Ignoring message from an old offset: ${offset} (expecting at least ${input.offset})`)
-					return
-				}
-				numConsumed++
-				let filteredOut = false
-				if (input.search) {
-					const text: string = `${value},${key},${schemaType?.name ?? ""}`
-					if (!Includes(text, input.search, input.searchStyle)) {
-						filteredOut = true
-						console.log(`Ignoring message from offset ${message.offset}, filtered out by search`)
-					}
-				}
-				if (!filteredOut) {
-					messages.push({ topic, partition, message, key, value, schemaType })
-				}
-				if (numConsumed >= input.limit) {
+				if (numConsumed >= input.limit || high >= endOffset) {
 					resolve()
 				}
-			},
+				endBatch(res, batchIdx)
+			}
 		})
 	})
 
+	res.startTime('seek', 'seek');
 	consumer.seek({ topic: input.topic, partition: input.partition, offset: input.offset.toString() })
+	res.endTime('seek');
 	try {
+		res.startTime('consume', 'consume');
 		await p;
+		res.endTime('consume');
 		return { messages, hasTimeout }
 	}
 	finally {
+		res.startTime('cleanupConsumer', 'cleanup consumer');
 		cleanupConsumer(consumer, groupId) //not awaiting this as we don't want to block the response
+		res.endTime('cleanupConsumer');
 	}
 }
 
