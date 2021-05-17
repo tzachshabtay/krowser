@@ -1,10 +1,11 @@
 import React from "react";
 import Button from '@material-ui/core/Button';
 import EventNote from '@material-ui/icons/EventNote';
+import { History } from 'history';
 
 export interface CellProps {
-    value?: number;
-    data: any;
+    value?: number | string;
+    data: { history: History<unknown> } & any;
 }
 
 export interface CellButtonProps extends CellProps {

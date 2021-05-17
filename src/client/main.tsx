@@ -16,6 +16,7 @@ import { GlobalThemeProvider } from "./common/theme_hook"
 import "./style.css";
 import { Connectors } from "./kafka-connect/connectors";
 import { Tasks } from "./kafka-connect/tasks";
+import { BrokerConfigs } from "./kafka/broker_configs";
 
 const App = () => {
 	return (
@@ -31,6 +32,7 @@ const App = () => {
 					<Route path="/topics/messages/:topics" exact component={Messages} />
 					<Route path="/topics/messages" exact component={Messages} />
 					<Route path="/brokers" exact component={Brokers} />
+					<Route path="/broker/configs/:broker" exact component={BrokerConfigs} />
 					<Route path="/groups" exact component={Groups} />
 					<Route path="/members/:group" exact component={Members} />
 					<Route path="/schema-registry/subjects" exact component={Subjects} />

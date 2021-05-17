@@ -7,11 +7,21 @@ import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
 import { Broker, GetClusterResult } from "../../shared/api";
 import { CancelToken, Loader } from "../common/loader";
+import { CellButton, CellProps } from "../common/cell_button";
+import { History } from 'history';
 
 type State = {
     loading: boolean;
     error?: string;
-    rows: Broker[];
+    rows: BrokerRow[];
+}
+
+type BrokerRow = { history: History<unknown> } & Broker
+
+class ViewConfigsButton extends React.Component<CellProps, {}> {
+    render() {
+        return <CellButton getUrl={() => `/broker/configs/${this.props.data.nodeId}`} data={this.props.data} value="View"/>
+    }
 }
 
 export class Brokers extends React.Component<RouteComponentProps, State> {
@@ -39,7 +49,7 @@ export class Brokers extends React.Component<RouteComponentProps, State> {
             this.setState({loading: false, error: data.error})
             return
         }
-        const rows = data.brokers
+        const rows: BrokerRow[] = data.brokers.map((r: Broker) => { return { history: this.props.history, ...r }})
         this.setState({ loading: false, rows })
     }
 
@@ -48,6 +58,7 @@ export class Brokers extends React.Component<RouteComponentProps, State> {
             { headerName: "Node ID", field: "nodeId", filter: "agNumberColumnFilter" },
             { headerName: "Host", field: "host" },
             { headerName: "Port", field: "port", filter: "agNumberColumnFilter" },
+            { headerName: "Configs", field: "view_configs", cellRendererFramework: ViewConfigsButton },
         ]
     }
 

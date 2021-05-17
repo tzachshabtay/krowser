@@ -86,7 +86,7 @@ app.get("/api/topic/:topic", async (req, res) => {
 		try {
 			const groups = await getTopicConsumerGroups(req.params.topic)
 			try {
-				const config: DescribeConfigResponse = await getTopicConfig(req.params.topic)
+				const config: DescribeConfigResponse = await getConfig(req.params.topic, ConfigResourceTypes.TOPIC)
 				res.status(200).json({offsets, groups, config} as GetTopicResult)
 			}
 			catch (error) {
@@ -118,7 +118,17 @@ app.get("/api/topic/:topic/offsets", async (req, res) => {
 
 app.get("/api/topic/:topic/config", async (req, res) => {
 	try {
-		const config = await getTopicConfig(req.params.topic)
+		const config = await getConfig(req.params.topic, ConfigResourceTypes.TOPIC)
+		res.status(200).json(config)
+	}
+	catch (error) {
+		res.status(500).json({ error: error.toString() })
+	}
+})
+
+app.get("/api/broker/:broker/config", async (req, res) => {
+	try {
+		const config = await getConfig(req.params.broker, ConfigResourceTypes.BROKER)
 		res.status(200).json(config)
 	}
 	catch (error) {
@@ -374,13 +384,12 @@ app.get("/*", (req, res) => {
 	res.render("index");
 });
 
-const getTopicConfig = async (topic: string): Promise<DescribeConfigResponse> => {
+const getConfig = async (name: string, type: ConfigResourceTypes): Promise<DescribeConfigResponse> => {
 	return await withRetry("describeConfigs", () => kafka.Admin.describeConfigs({
 		includeSynonyms: false,
 		resources: [
 			{
-			type: ConfigResourceTypes.TOPIC,
-			name: topic
+			type, name
 			}
 		]
 	}))
