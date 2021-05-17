@@ -14,6 +14,7 @@ export type Broker = { nodeId: number; host: string; port: number }
 export type GetTopicsResult = MaybeError & { topics: ITopicMetadata[] }
 export type GetTopicOffsetsResult = MaybeError & { offsets: TopicsOffsets }
 export type GetTopicConfigsResult = MaybeError & DescribeConfigResponse
+export type GetBrokerConfigsResult = MaybeError & DescribeConfigResponse
 export type GetTopicConsumerGroupsResult = MaybeError & TopicConsumerGroups
 export type GetTopicResult = MaybeError & { offsets: TopicsOffsets, config?: DescribeConfigResponse, groups?: TopicConsumerGroups}
 export type GetClusterResult = MaybeError & { brokers: Array<Broker>, controller: number | null, clusterId: string }
