@@ -6,12 +6,12 @@
   "repository": "github:tzachshabtay/Krowser",
   "scripts": {
     "test": "echo \"todo\"",
-    "build:backend": "cd ./src/server && tsc",
+    "build:backend": "cd ./src/server && cargo build",
     "build:frontend": "cd ./src/client && webpack",
     "kafka-up": "cd ./test && docker-compose -f docker-compose-single-broker.yml up -d",
     "kafka-down": "cd ./test && docker-compose -f docker-compose-single-broker.yml down",
     "insert-events": "cd ./test && node ./publisher.js",
-    "start": "node ./dist/server/main.js"
+    "start": "cd ./src/server && cargo run"
   },
   "author": "Tzach Shabtay",
   "license": "ISC",
