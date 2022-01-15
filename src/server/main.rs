@@ -45,6 +45,18 @@ struct GetTopicsResult {
     topics: Vec<TopicMetadata>,
 }
 
+#[derive(Serialize)]
+struct TopicOffsets {
+    partition: i32,
+    high: i64,
+    low: i64,
+}
+
+#[derive(Serialize)]
+struct GetTopicOffsetsResult {
+    offsets: Vec<TopicOffsets>
+}
+
 fn map_kafka_error<T>(result: KafkaResult<T>) -> Result<T, String> {
     match result {
         Ok(v) => Ok(v),
@@ -87,6 +99,38 @@ fn get_topics() -> Result<Json<GetTopicsResult>, String> {
     }))
 }
 
+#[get("/api/topic/<topic>/offsets")]
+fn get_offsets(topic: &str) -> Result<Json<GetTopicOffsetsResult>, String> {
+    println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
+    let consumer: BaseConsumer = map_kafka_error(ClientConfig::new()
+        .set("bootstrap.servers", &config::KAFKA_URLS)
+        .create())?;
+
+    let timeout = Duration::from_secs(10);
+    let metadata = map_kafka_error(consumer
+        .fetch_metadata(Some(topic), timeout))?;
+    if metadata.topics().len() == 0 {
+        return Err("topic not found".to_string())
+    }
+    if metadata.topics().len() > 1 {
+        return Err("too many topics found".to_string())
+    }
+    let partitions = metadata.topics()[0].partitions();
+    let mut offsets = Vec::with_capacity(partitions.len());
+    for partition in partitions {
+        let watermarks = map_kafka_error(consumer
+            .fetch_watermarks(topic, partition.id(), timeout))?;
+        offsets.push(TopicOffsets{
+            partition: partition.id(),
+            low: watermarks.0,
+            high: watermarks.1,
+        });
+    }
+    Ok(Json(GetTopicOffsetsResult{
+        offsets: offsets,
+    }))
+}
+
 fn public() -> &'static str {
     relative!("../../public")
 }
@@ -97,5 +141,5 @@ fn assets() -> &'static str {
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![index, files, get_topics])
+    rocket::build().mount("/", routes![index, files, get_topics, get_offsets])
 }

@@ -3,7 +3,7 @@ import { Schema, Type } from "avsc";
 
 export type MaybeError = { error?: string }
 
-export type TopicOffsets = SeekEntry & { high: string, low: string}
+export type TopicOffsets = { partition: number, high: number, low: number}
 export type TopicsOffsets = Array<TopicOffsets>
 export type ConsumerOffsets = Array<SeekEntry & { metadata: string | null, partitionOffsets?: TopicOffsets }>
 export type TopicConsumerGroups = Array<{groupId: string, offsets: ConsumerOffsets}>

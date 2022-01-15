@@ -106,8 +106,8 @@ export class Topics extends React.Component<RouteComponentProps, State> {
         }
         let sum = 0
         for (const partition of data.offsets) {
-            const high = parseInt(partition.high)
-            sum += high
+            const messages_in_partition = partition.high - partition.low
+            sum += messages_in_partition
         }
         topic.offsets = data.offsets
         topic.config = data.config

@@ -24,9 +24,8 @@ class ViewMessagesButton extends React.Component<CellProps, {}> {
 
 type Partition = {
     partition: number,
-    offset: string,
-    low: string,
-    high: string,
+    low: number,
+    high: number,
     topic: string,
     raw: TopicOffsets,
     history: History<unknown>,
@@ -58,7 +57,7 @@ export class Partitions extends React.Component<RouteComponentProps<{ topic: str
             return
         }
         const results: Partition[] = data.offsets.map(r => {
-            return { partition: r.partition, offset: r.offset, low: r.low, high: r.high, topic: this.props.match.params.topic, raw: r, history: this.props.history }
+            return { partition: r.partition, low: r.low, high: r.high, topic: this.props.match.params.topic, raw: r, history: this.props.history }
         })
         this.setState({ loading: false, rows: results })
     }

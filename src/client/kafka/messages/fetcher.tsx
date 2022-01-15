@@ -224,7 +224,7 @@ export class Fetcher extends React.Component<Props, State> {
                 if (offsets === undefined) {
                     return
                 }
-                await this.setStateAsync({offset: parseInt(offsets.low)})
+                await this.setStateAsync({offset: offsets.low})
                 out = await this.fetchMessagesForPartition(topic, timeout, partition, out, cancelToken)
             }
         }
@@ -242,9 +242,9 @@ export class Fetcher extends React.Component<Props, State> {
                 if (offsets === undefined) {
                     return
                 }
-                let offset = parseInt(offsets.high) - this.state.limit
-                if (offset < parseInt(offsets.low)) {
-                    offset = parseInt(offsets.low)
+                let offset = offsets.high - this.state.limit
+                if (offset < offsets.low) {
+                    offset = offsets.low
                 }
                 await this.setStateAsync({offset})
                 out = await this.fetchMessagesForPartition(topic, timeout, partition, out, cancelToken)
