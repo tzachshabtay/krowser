@@ -29,8 +29,8 @@ use futures::StreamExt;
 
 mod config;
 
-#[get("/")]
-async fn index() -> Option<NamedFile> {
+#[get("/<_file..>")]
+async fn index(_file: PathBuf) -> Option<NamedFile> {
     let page_directory_path = public();
     NamedFile::open(Path::new(&page_directory_path).join("index.html")).await.ok()
 }
