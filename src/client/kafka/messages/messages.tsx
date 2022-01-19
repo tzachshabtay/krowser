@@ -41,10 +41,10 @@ export class Messages extends React.Component<Props, State> {
 
     getRow = (data: TopicMessage, customCols: {cols: {}}): any => {
         let row: any = {
-            rowTimestamp: data.message.timestamp,
-            rowOffset: parseInt(data.message.offset),
+            rowTimestamp: data.timestamp,
+            rowOffset: data.offset,
             rowValue: data.value,
-            rowType: data.schemaType ? data.schemaType.name : "",
+            rowType: data.schema_type ? data.schema_type : "",
             rowKey: data.key,
             rowTopic: data.topic,
             rowPartition: data.partition,

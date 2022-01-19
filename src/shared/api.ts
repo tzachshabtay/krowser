@@ -7,7 +7,7 @@ export type TopicOffsets = { partition: number, high: number, low: number}
 export type TopicsOffsets = Array<TopicOffsets>
 export type ConsumerOffsets = Array<SeekEntry & { metadata: string | null, partitionOffsets?: TopicOffsets }>
 export type TopicConsumerGroups = Array<{groupId: string, offsets: ConsumerOffsets}>
-export type TopicMessage = { topic: string, partition: number, value: string, key: string, message: KafkaMessage, schemaType: Type | undefined }
+export type TopicMessage = { topic: string, partition: number, value: string, key: string, timestamp: number, offset: number, schema_type: string | undefined }
 export type TopicMessages = { messages: TopicMessage[], hasTimeout: boolean }
 export type Broker = { nodeId: number; host: string; port: number }
 
