@@ -23,6 +23,8 @@ use std::time::Duration;
 
 use futures::StreamExt;
 
+use regex::Regex;
+
 use crate::config;
 
 #[derive(PartialEq, Serialize, Deserialize, Debug, Clone)]
@@ -82,22 +84,22 @@ pub enum SearchStyle {
     Regex,
 }
 
-fn map_kafka_error<T>(result: KafkaResult<T>) -> Result<T, String> {
+fn map_error<T, E: std::fmt::Debug>(result: Result<T, E>) -> Result<T, String> {
     match result {
         Ok(v) => Ok(v),
-        Err(e) => Err(format!("{}", e)),
+        Err(e) => Err(format!("{:?}", e)),
     }
 }
 
 #[get("/api/topics")]
 pub fn get_topics() -> Result<Json<GetTopicsResult>, String> {
     println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
-    let consumer: BaseConsumer = map_kafka_error(ClientConfig::new()
+    let consumer: BaseConsumer = map_error(ClientConfig::new()
         .set("bootstrap.servers", &*config::KAFKA_URLS)
         .create())?;
 
     let timeout = Duration::from_secs(10);
-    let metadata = map_kafka_error(consumer
+    let metadata = map_error(consumer
         .fetch_metadata(None, timeout))?;
 
     let mut topics = Vec::with_capacity(metadata.topics().len());
@@ -129,12 +131,12 @@ pub fn get_topics() -> Result<Json<GetTopicsResult>, String> {
 #[get("/api/topic/<topic>/offsets")]
 pub fn get_offsets(topic: &str) -> Result<Json<GetTopicOffsetsResult>, String> {
     println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
-    let consumer: BaseConsumer = map_kafka_error(ClientConfig::new()
+    let consumer: BaseConsumer = map_error(ClientConfig::new()
         .set("bootstrap.servers", &*config::KAFKA_URLS)
         .create())?;
 
     let timeout = Duration::from_secs(10);
-    let metadata = map_kafka_error(consumer
+    let metadata = map_error(consumer
         .fetch_metadata(Some(topic), timeout))?;
     if metadata.topics().len() == 0 {
         return Err("topic not found".to_string())
@@ -145,7 +147,7 @@ pub fn get_offsets(topic: &str) -> Result<Json<GetTopicOffsetsResult>, String> {
     let partitions = metadata.topics()[0].partitions();
     let mut offsets = Vec::with_capacity(partitions.len());
     for partition in partitions {
-        let watermarks = map_kafka_error(consumer
+        let watermarks = map_error(consumer
             .fetch_watermarks(topic, partition.id(), timeout))?;
         offsets.push(TopicOffsets{
             partition: partition.id(),
@@ -193,7 +195,7 @@ pub async fn get_messages(
     partition: i32,
     limit: Option<i64>,
     offset: Option<i64>,
-    search: Option<String>,
+    search: Option<&str>,
     search_style: Option<SearchStyle>,
     timeout: Option<i32>,
     trace: bool) -> Result<Json<GetTopicMessagesResult>, String> {
@@ -202,6 +204,13 @@ pub async fn get_messages(
         let timeout = timeout.unwrap_or(20000);
         let search_style = search_style.unwrap_or(SearchStyle::None);
         eprintln!("{:?} {:?} {}", search, search_style, timeout);
+        let regex: Option<Regex> = match search_style {
+            SearchStyle::Regex =>
+                if let Some(pattern) = &search
+                    { Some(map_error(Regex::new(pattern))?) } else
+                    { None },
+            _ => None,
+        };
         let topic_offsets = get_offsets(topic)?;
         let mut found_partition = false;
         for offsets in &topic_offsets.offsets{
@@ -228,15 +237,15 @@ pub async fn get_messages(
         let context = CustomContext;
 
         println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
-        let consumer: LoggingConsumer = map_kafka_error(ClientConfig::new()
+        let consumer: LoggingConsumer = map_error(ClientConfig::new()
             .set("bootstrap.servers", &*config::KAFKA_URLS)
             .set("group.id", "krowser")
             .set("enable.auto.commit", "false")
             .create_with_context(context))?;
 
         let mut assignment = TopicPartitionList::new();
-        map_kafka_error(assignment.add_partition_offset(topic, partition, rdkafka::Offset::Offset(offset)))?;
-        map_kafka_error(consumer.assign(&assignment))?;
+        map_error(assignment.add_partition_offset(topic, partition, rdkafka::Offset::Offset(offset)))?;
+        map_error(consumer.assign(&assignment))?;
 
         let srs = SrSettings::new((&*config::SCHEMA_REGISTRY_URL).to_string());
         let mut avro_decoder = AvroDecoder::new(srs);
@@ -267,16 +276,26 @@ pub async fn get_messages(
                         eprintln!("key: '{:?}', value: {:?}, topic: {}, offset: {}, timestamp: {:?}",
                             key, decoded.value, m.topic(), m.offset(), timestamp);
                     }
-                    let msg = TopicMessage{
-                        topic: topic.to_string(),
-                        partition: partition,
-                        key: key.to_owned(),
-                        timestamp: timestamp,
-                        offset: m.offset(),
-                        value: decoded.value,
-                        schema_type: decoded.schema,
-                    };
-                    messages.push(msg);
+                    let mut filtered_out = false;
+                    if let Some(pattern) = search {
+                        let schema = *&decoded.schema.as_ref();
+                        let text = format!("{},{},{}", key.to_string(), decoded.value, schema.unwrap_or(&"".to_string()));
+                        if !includes(text, pattern.to_string(), &search_style, &regex) {
+                            filtered_out = true;
+                        }
+                    }
+                    if !filtered_out {
+                        let msg = TopicMessage{
+                            topic: topic.to_string(),
+                            partition: partition,
+                            key: key.to_owned(),
+                            timestamp: timestamp,
+                            offset: m.offset(),
+                            value: decoded.value,
+                            schema_type: decoded.schema,
+                        };
+                        messages.push(msg);
+                    }
                 }
             };
             if num_consumed >= limit {
@@ -359,5 +378,13 @@ fn decode_bytes(val: &mut Value) {
             decode_bytes(uni);
         }
         _ => {},
+    }
+}
+
+fn includes(text: String, pattern: String, style: &SearchStyle, regex: &Option<Regex>) -> bool {
+    match style {
+        SearchStyle::None => text.to_ascii_lowercase().contains(&pattern.to_ascii_lowercase()),
+        SearchStyle::CaseSensitive => text.contains(&pattern),
+        SearchStyle::Regex => (*regex).as_ref().unwrap().is_match(&text),
     }
 }
