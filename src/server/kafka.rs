@@ -91,6 +91,35 @@ fn map_error<T, E: std::fmt::Debug>(result: Result<T, E>) -> Result<T, String> {
     }
 }
 
+struct CustomContext;
+
+impl ClientContext for CustomContext {
+
+    fn error(&self, error: KafkaError, reason: &str) {
+        match error {
+            KafkaError::PartitionEOF(i) => println!("Partition EOF: {}, reason: {}", i, reason),
+            _ => ()
+        }
+    }
+}
+
+impl ConsumerContext for CustomContext {
+    fn pre_rebalance(&self, rebalance: &Rebalance) {
+        eprintln!("Pre rebalance {:?}", rebalance);
+    }
+
+    fn post_rebalance(&self, rebalance: &Rebalance) {
+        eprintln!("Post rebalance {:?}", rebalance);
+    }
+
+    fn commit_callback(&self, result: KafkaResult<()>, _offsets: &TopicPartitionList) {
+        eprintln!("Committing offsets: {:?}", result);
+    }
+
+}
+
+type LoggingConsumer = StreamConsumer<CustomContext>;
+
 #[get("/api/topics")]
 pub fn get_topics() -> Result<Json<GetTopicsResult>, String> {
     println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
@@ -159,35 +188,6 @@ pub fn get_offsets(topic: &str) -> Result<Json<GetTopicOffsetsResult>, String> {
         offsets: offsets,
     }))
 }
-
-struct CustomContext;
-
-impl ClientContext for CustomContext {
-
-    fn error(&self, error: KafkaError, reason: &str) {
-        match error {
-            KafkaError::PartitionEOF(i) => println!("Partition EOF: {}, reason: {}", i, reason),
-            _ => ()
-        }
-    }
-}
-
-impl ConsumerContext for CustomContext {
-    fn pre_rebalance(&self, rebalance: &Rebalance) {
-        eprintln!("Pre rebalance {:?}", rebalance);
-    }
-
-    fn post_rebalance(&self, rebalance: &Rebalance) {
-        eprintln!("Post rebalance {:?}", rebalance);
-    }
-
-    fn commit_callback(&self, result: KafkaResult<()>, _offsets: &TopicPartitionList) {
-        eprintln!("Committing offsets: {:?}", result);
-    }
-
-}
-
-type LoggingConsumer = StreamConsumer<CustomContext>;
 
 #[get("/api/messages/<topic>/<partition>?<limit>&<offset>&<search>&<search_style>&<timeout>&<trace>")]
 pub async fn get_messages(
