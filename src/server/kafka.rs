@@ -248,17 +248,15 @@ fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<TopicOffsets>) -> Resul
                 Some(assgn) => {
                     match std::str::from_utf8(assgn) {
                         Ok(v) => {
-                            eprintln!("member assignment for group {}: {}", group.name(), v);
+                            //eprintln!("member assignment for group {}: {}", group.name(), v);
                             let pattern = format!("{}\u{0000}", topic);
                             if v.contains(&pattern) {
-                                eprintln!("FOUND PATTERN!");
                                 let group_consumer: BaseConsumer = map_error(ClientConfig::new()
                                     .set("bootstrap.servers", &*config::KAFKA_URLS)
                                     .set("group.id", group.name())
                                     .create())?;
                                 let committed: TopicPartitionList = map_error(group_consumer.committed(timeout))?;
                                 for elem in committed.elements() {
-                                    eprintln!("ELEM- {}!!", elem.topic());
                                     if let rdkafka::Offset::Offset(offset) = elem.offset() {
                                         if let Some(partition_offsets) = offsets.iter().find(|v| v.partition == elem.partition()) {
                                             let consumer_offsets = ConsumerGroupOffsets{
