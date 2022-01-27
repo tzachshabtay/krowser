@@ -47,7 +47,7 @@ pub struct GetTopicsResult {
     topics: Vec<TopicMetadata>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Copy, Clone)]
 pub struct TopicOffsets {
     partition: i32,
     high: i64,
@@ -55,8 +55,27 @@ pub struct TopicOffsets {
 }
 
 #[derive(Serialize)]
+pub struct ConsumerGroupOffsets {
+    metadata: Option<String>,
+    offset: i64,
+    partition_offsets: TopicOffsets,
+}
+
+#[derive(Serialize)]
+pub struct TopicConsumerGroup {
+    group_id: String,
+    offsets: Vec<ConsumerGroupOffsets>,
+}
+
+#[derive(Serialize)]
 pub struct GetTopicOffsetsResult {
     offsets: Vec<TopicOffsets>
+}
+
+#[derive(Serialize)]
+pub struct GetTopicResult {
+    offsets: Vec<TopicOffsets>,
+    consumer_groups: Vec<TopicConsumerGroup>
 }
 
 #[derive(Serialize)]
@@ -157,8 +176,25 @@ pub fn get_topics() -> Result<Json<GetTopicsResult>, String> {
     }))
 }
 
+#[get("/api/topic/<topic>")]
+pub fn get_topic(topic: &str) -> Result<Json<GetTopicResult>, String> {
+    let offsets = _get_offsets(topic)?;
+    let groups = _get_topic_consumer_groups(topic, &offsets)?;
+    Ok(Json(GetTopicResult{
+        offsets: offsets,
+        consumer_groups: groups,
+    }))
+}
+
 #[get("/api/topic/<topic>/offsets")]
 pub fn get_offsets(topic: &str) -> Result<Json<GetTopicOffsetsResult>, String> {
+    let offsets = _get_offsets(topic)?;
+    Ok(Json(GetTopicOffsetsResult{
+        offsets: offsets,
+    }))
+}
+
+fn _get_offsets(topic: &str) -> Result<Vec<TopicOffsets>, String> {
     println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
     let consumer: BaseConsumer = map_error(ClientConfig::new()
         .set("bootstrap.servers", &*config::KAFKA_URLS)
@@ -184,9 +220,76 @@ pub fn get_offsets(topic: &str) -> Result<Json<GetTopicOffsetsResult>, String> {
             high: watermarks.1,
         });
     }
-    Ok(Json(GetTopicOffsetsResult{
-        offsets: offsets,
-    }))
+    Ok(offsets)
+}
+
+fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<TopicOffsets>) -> Result<Vec<TopicConsumerGroup>, String> {
+    println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
+    let consumer: BaseConsumer = map_error(ClientConfig::new()
+        .set("bootstrap.servers", &*config::KAFKA_URLS)
+        .create())?;
+
+    //todo: we're fetching all groups each time we fetch for a specific topic, we can use a very short-lived cache instead as we query for all topics from the topics page
+    let timeout = Duration::from_secs(10);
+    let groups = map_error(consumer
+        .fetch_group_list(None, timeout))?;
+
+    let groups = groups.groups();
+    let mut topic_groups = Vec::with_capacity(groups.len());
+    for group in groups {
+        if group.protocol_type() != "consumer" {
+            eprintln!("skipping group {} of type {}", group.name(), group.protocol_type());
+            continue
+        }
+        let mut consumer_group_offsets = Vec::with_capacity(group.members().len());
+        for member in group.members() {
+            match member.assignment() {
+                None => continue,
+                Some(assgn) => {
+                    match std::str::from_utf8(assgn) {
+                        Ok(v) => {
+                            eprintln!("member assignment for group {}: {}", group.name(), v);
+                            let pattern = format!("{}\u{0000}", topic);
+                            if v.contains(&pattern) {
+                                eprintln!("FOUND PATTERN!");
+                                let group_consumer: BaseConsumer = map_error(ClientConfig::new()
+                                    .set("bootstrap.servers", &*config::KAFKA_URLS)
+                                    .set("group.id", group.name())
+                                    .create())?;
+                                let committed: TopicPartitionList = map_error(group_consumer.committed(timeout))?;
+                                for elem in committed.elements() {
+                                    eprintln!("ELEM- {}!!", elem.topic());
+                                    if let rdkafka::Offset::Offset(offset) = elem.offset() {
+                                        if let Some(partition_offsets) = offsets.iter().find(|v| v.partition == elem.partition()) {
+                                            let consumer_offsets = ConsumerGroupOffsets{
+                                                metadata: Some(elem.metadata().to_string()),
+                                                offset: offset,
+                                                partition_offsets: *partition_offsets,
+                                            };
+                                            eprintln!("PUSHING!!");
+                                            consumer_group_offsets.push(consumer_offsets);
+                                        } else {
+                                            eprintln!("did not find offsets for topic {} and partition {}", topic, elem.partition());
+                                        }
+                                    } else {
+                                        eprintln!("bad offset type: {:?}", elem.offset());
+                                    }
+                                }
+                            }
+                        },
+                        Err(_) => eprintln!("failed to parse member assignment"),
+                    }
+                }
+            }
+        }
+        let topic_group = TopicConsumerGroup{
+            group_id: group.name().to_string(),
+            offsets: consumer_group_offsets,
+        };
+        topic_groups.push(topic_group);
+    }
+
+    Ok(topic_groups)
 }
 
 #[get("/api/messages/<topic>/<partition>?<limit>&<offset>&<search>&<search_style>&<timeout>&<trace>")]

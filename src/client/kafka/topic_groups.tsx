@@ -76,18 +76,18 @@ export class TopicGroups extends React.Component<RouteComponentProps<{ topic: st
         const results: Group[] = []
         for (const group of data) {
             for (const partition of group.offsets) {
-                const high = partition.partitionOffsets?.high ?? -1
+                const high = partition.partition_offsets?.high ?? -1
                 const offset = parseInt(partition.offset)
                 let lag = high - offset
                 if (offset === -1) {
                     lag -= 1
                 }
                 results.push({
-                    name: group.groupId,
+                    name: group.group_id,
                     partition: partition.partition,
                     offset,
                     high,
-                    low: partition.partitionOffsets?.low ?? -1,
+                    low: partition.partition_offsets?.low ?? -1,
                     lag,
                 })
             }

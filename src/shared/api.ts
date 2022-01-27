@@ -1,12 +1,12 @@
 import { DescribeConfigResponse, ITopicMetadata, SeekEntry, KafkaMessage } from "kafkajs";
-import { Schema, Type } from "avsc";
+import { Schema } from "avsc";
 
 export type MaybeError = { error?: string }
 
 export type TopicOffsets = { partition: number, high: number, low: number}
 export type TopicsOffsets = Array<TopicOffsets>
-export type ConsumerOffsets = Array<SeekEntry & { metadata: string | null, partitionOffsets?: TopicOffsets }>
-export type TopicConsumerGroups = Array<{groupId: string, offsets: ConsumerOffsets}>
+export type ConsumerOffsets = Array<SeekEntry & { metadata: string | null, partition_offsets?: TopicOffsets }>
+export type TopicConsumerGroups = Array<{group_id: string, offsets: ConsumerOffsets}>
 export type TopicMessage = { topic: string, partition: number, value: string, key: string, timestamp: number, offset: number, schema_type: string | undefined }
 export type TopicMessages = { messages: TopicMessage[], hasTimeout: boolean }
 export type Broker = { nodeId: number; host: string; port: number }
@@ -16,7 +16,7 @@ export type GetTopicOffsetsResult = MaybeError & { offsets: TopicsOffsets }
 export type GetTopicConfigsResult = MaybeError & DescribeConfigResponse
 export type GetBrokerConfigsResult = MaybeError & DescribeConfigResponse
 export type GetTopicConsumerGroupsResult = MaybeError & TopicConsumerGroups
-export type GetTopicResult = MaybeError & { offsets: TopicsOffsets, config?: DescribeConfigResponse, groups?: TopicConsumerGroups}
+export type GetTopicResult = MaybeError & { offsets: TopicsOffsets, groups?: TopicConsumerGroups}
 export type GetClusterResult = MaybeError & { brokers: Array<Broker>, controller: number | null, clusterId: string }
 export type GetTopicOffsetsByTimestapResult = MaybeError & SeekEntry[]
 export type GetTopicMessagesResult = MaybeError & TopicMessages

@@ -35,6 +35,7 @@ fn rocket() -> _ {
         files,
         kafka::get_topics,
         kafka::get_offsets,
-        kafka::get_messages
+        kafka::get_messages,
+        kafka::get_topic,
     ])
 }
