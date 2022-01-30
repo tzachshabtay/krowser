@@ -5,7 +5,7 @@ export type MaybeError = { error?: string }
 
 export type TopicOffsets = { partition: number, high: number, low: number}
 export type TopicsOffsets = Array<TopicOffsets>
-export type ConsumerOffsets = Array<SeekEntry & { metadata: string | null, partition_offsets?: TopicOffsets }>
+export type ConsumerOffsets = Array<{ metadata: string | null, offset: number, partition_offsets?: TopicOffsets }>
 export type TopicConsumerGroups = Array<{group_id: string, offsets: ConsumerOffsets}>
 export type TopicMessage = { topic: string, partition: number, value: string, key: string, timestamp: number, offset: number, schema_type: string | undefined }
 export type TopicMessages = { messages: TopicMessage[], hasTimeout: boolean }
@@ -15,7 +15,7 @@ export type GetTopicsResult = MaybeError & { topics: ITopicMetadata[] }
 export type GetTopicOffsetsResult = MaybeError & { offsets: TopicsOffsets }
 export type GetTopicConfigsResult = MaybeError & DescribeConfigResponse
 export type GetBrokerConfigsResult = MaybeError & DescribeConfigResponse
-export type GetTopicConsumerGroupsResult = MaybeError & TopicConsumerGroups
+export type GetTopicConsumerGroupsResult = MaybeError & { consumer_groups: TopicConsumerGroups }
 export type GetTopicResult = MaybeError & { offsets: TopicsOffsets, consumer_groups?: TopicConsumerGroups}
 export type GetClusterResult = MaybeError & { brokers: Array<Broker>, controller: number | null, clusterId: string }
 export type GetTopicOffsetsByTimestapResult = MaybeError & SeekEntry[]

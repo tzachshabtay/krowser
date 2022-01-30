@@ -37,5 +37,6 @@ fn rocket() -> _ {
         kafka::get_offsets,
         kafka::get_messages,
         kafka::get_topic,
+        kafka::get_topic_consumer_groups,
     ])
 }

@@ -79,6 +79,11 @@ pub struct GetTopicResult {
 }
 
 #[derive(Serialize)]
+pub struct GetTopicConsumerGroupsResult {
+    consumer_groups: Vec<TopicConsumerGroup>
+}
+
+#[derive(Serialize)]
 pub struct TopicMessage {
     topic: String,
     partition: i32,
@@ -186,6 +191,13 @@ pub fn get_topic(topic: &str) -> Result<Json<GetTopicResult>, String> {
     }))
 }
 
+#[get("/api/topic/<topic>/consumer_groups")]
+pub fn get_topic_consumer_groups(topic: &str) -> Result<Json<GetTopicConsumerGroupsResult>, String> {
+    let offsets = _get_offsets(topic)?;
+    let groups = _get_topic_consumer_groups(topic, &offsets)?;
+    Ok(Json(GetTopicConsumerGroupsResult{consumer_groups: groups}))
+}
+
 #[get("/api/topic/<topic>/offsets")]
 pub fn get_offsets(topic: &str) -> Result<Json<GetTopicOffsetsResult>, String> {
     let offsets = _get_offsets(topic)?;
@@ -241,7 +253,6 @@ fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<TopicOffsets>) -> Resul
             eprintln!("skipping group {} of type {}", group.name(), group.protocol_type());
             continue
         }
-        let mut consumer_group_offsets = Vec::with_capacity(group.members().len());
         for member in group.members() {
             match member.assignment() {
                 None => continue,
@@ -251,10 +262,17 @@ fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<TopicOffsets>) -> Resul
                             //eprintln!("member assignment for group {}: {}", group.name(), v);
                             let pattern = format!("{}\u{0000}", topic);
                             if v.contains(&pattern) {
+                                let mut consumer_group_offsets = Vec::with_capacity(group.members().len());
                                 let group_consumer: BaseConsumer = map_error(ClientConfig::new()
                                     .set("bootstrap.servers", &*config::KAFKA_URLS)
                                     .set("group.id", group.name())
+                                    .set("enable.auto.commit", "false")
                                     .create())?;
+                                    let mut assignment = TopicPartitionList::new();
+                                    for offset in offsets {
+                                        map_error(assignment.add_partition_offset(topic, offset.partition, rdkafka::Offset::Offset(0)))?;
+                                    }
+                                    map_error(group_consumer.assign(&assignment))?;
                                 let committed: TopicPartitionList = map_error(group_consumer.committed(timeout))?;
                                 for elem in committed.elements() {
                                     if let rdkafka::Offset::Offset(offset) = elem.offset() {
@@ -264,7 +282,6 @@ fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<TopicOffsets>) -> Resul
                                                 offset: offset,
                                                 partition_offsets: *partition_offsets,
                                             };
-                                            eprintln!("PUSHING!!");
                                             consumer_group_offsets.push(consumer_offsets);
                                         } else {
                                             eprintln!("did not find offsets for topic {} and partition {}", topic, elem.partition());
@@ -273,18 +290,18 @@ fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<TopicOffsets>) -> Resul
                                         eprintln!("bad offset type: {:?}", elem.offset());
                                     }
                                 }
+                                let topic_group = TopicConsumerGroup{
+                                    group_id: group.name().to_string(),
+                                    offsets: consumer_group_offsets,
+                                };
+                                topic_groups.push(topic_group);
                             }
                         },
-                        Err(_) => eprintln!("failed to parse member assignment"),
+                        Err(_) => eprintln!("failed to parse member assignment for group {}", group.name()),
                     }
                 }
             }
         }
-        let topic_group = TopicConsumerGroup{
-            group_id: group.name().to_string(),
-            offsets: consumer_group_offsets,
-        };
-        topic_groups.push(topic_group);
     }
 
     Ok(topic_groups)
