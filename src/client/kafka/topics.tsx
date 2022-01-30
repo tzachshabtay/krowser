@@ -49,7 +49,7 @@ type Topic = {
     raw: ITopicMetadata,
     history: History<unknown>,
     offsets?: TopicsOffsets,
-    groups?: TopicConsumerGroups,
+    groups?: string[],
     num_messages?: number,
     num_groups?: number | `Unknown`,
 }
@@ -108,7 +108,7 @@ export class Topics extends React.Component<RouteComponentProps, State> {
             sum += messages_in_partition
         }
         topic.offsets = data.offsets
-        topic.groups = data.consumer_groups
+        topic.groups = data.consumer_groups?.map(p => p.group_id)
         topic.num_messages = sum
         if (data.consumer_groups) {
             topic.num_groups = data.consumer_groups.length

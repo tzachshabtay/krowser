@@ -184,7 +184,7 @@ pub fn get_topics() -> Result<Json<GetTopicsResult>, String> {
 #[get("/api/topic/<topic>")]
 pub fn get_topic(topic: &str) -> Result<Json<GetTopicResult>, String> {
     let offsets = _get_offsets(topic)?;
-    let groups = _get_topic_consumer_groups(topic, &offsets)?;
+    let groups = _get_topic_consumer_groups(topic, &offsets, false)?;
     Ok(Json(GetTopicResult{
         offsets: offsets,
         consumer_groups: groups,
@@ -194,7 +194,7 @@ pub fn get_topic(topic: &str) -> Result<Json<GetTopicResult>, String> {
 #[get("/api/topic/<topic>/consumer_groups")]
 pub fn get_topic_consumer_groups(topic: &str) -> Result<Json<GetTopicConsumerGroupsResult>, String> {
     let offsets = _get_offsets(topic)?;
-    let groups = _get_topic_consumer_groups(topic, &offsets)?;
+    let groups = _get_topic_consumer_groups(topic, &offsets, true)?;
     Ok(Json(GetTopicConsumerGroupsResult{consumer_groups: groups}))
 }
 
@@ -235,7 +235,7 @@ fn _get_offsets(topic: &str) -> Result<Vec<TopicOffsets>, String> {
     Ok(offsets)
 }
 
-fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<TopicOffsets>) -> Result<Vec<TopicConsumerGroup>, String> {
+fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<TopicOffsets>, with_committed_offset: bool) -> Result<Vec<TopicConsumerGroup>, String> {
     println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
     let consumer: BaseConsumer = map_error(ClientConfig::new()
         .set("bootstrap.servers", &*config::KAFKA_URLS)
@@ -263,31 +263,33 @@ fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<TopicOffsets>) -> Resul
                             let pattern = format!("{}\u{0000}", topic);
                             if v.contains(&pattern) {
                                 let mut consumer_group_offsets = Vec::with_capacity(group.members().len());
-                                let group_consumer: BaseConsumer = map_error(ClientConfig::new()
-                                    .set("bootstrap.servers", &*config::KAFKA_URLS)
-                                    .set("group.id", group.name())
-                                    .set("enable.auto.commit", "false")
-                                    .create())?;
-                                    let mut assignment = TopicPartitionList::new();
-                                    for offset in offsets {
-                                        map_error(assignment.add_partition_offset(topic, offset.partition, rdkafka::Offset::Offset(0)))?;
-                                    }
-                                    map_error(group_consumer.assign(&assignment))?;
-                                let committed: TopicPartitionList = map_error(group_consumer.committed(timeout))?;
-                                for elem in committed.elements() {
-                                    if let rdkafka::Offset::Offset(offset) = elem.offset() {
-                                        if let Some(partition_offsets) = offsets.iter().find(|v| v.partition == elem.partition()) {
-                                            let consumer_offsets = ConsumerGroupOffsets{
-                                                metadata: Some(elem.metadata().to_string()),
-                                                offset: offset,
-                                                partition_offsets: *partition_offsets,
-                                            };
-                                            consumer_group_offsets.push(consumer_offsets);
-                                        } else {
-                                            eprintln!("did not find offsets for topic {} and partition {}", topic, elem.partition());
+                                if with_committed_offset {
+                                    let group_consumer: BaseConsumer = map_error(ClientConfig::new()
+                                        .set("bootstrap.servers", &*config::KAFKA_URLS)
+                                        .set("group.id", group.name())
+                                        .set("enable.auto.commit", "false")
+                                        .create())?;
+                                        let mut assignment = TopicPartitionList::new();
+                                        for offset in offsets {
+                                            map_error(assignment.add_partition_offset(topic, offset.partition, rdkafka::Offset::Offset(0)))?;
                                         }
-                                    } else {
-                                        eprintln!("bad offset type: {:?}", elem.offset());
+                                        map_error(group_consumer.assign(&assignment))?;
+                                    let committed: TopicPartitionList = map_error(group_consumer.committed(timeout))?;
+                                    for elem in committed.elements() {
+                                        if let rdkafka::Offset::Offset(offset) = elem.offset() {
+                                            if let Some(partition_offsets) = offsets.iter().find(|v| v.partition == elem.partition()) {
+                                                let consumer_offsets = ConsumerGroupOffsets{
+                                                    metadata: Some(elem.metadata().to_string()),
+                                                    offset: offset,
+                                                    partition_offsets: *partition_offsets,
+                                                };
+                                                consumer_group_offsets.push(consumer_offsets);
+                                            } else {
+                                                eprintln!("did not find offsets for topic {} and partition {}", topic, elem.partition());
+                                            }
+                                        } else {
+                                            eprintln!("bad offset type: {:?}", elem.offset());
+                                        }
                                     }
                                 }
                                 let topic_group = TopicConsumerGroup{
