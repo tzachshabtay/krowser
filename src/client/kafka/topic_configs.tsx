@@ -6,25 +6,24 @@ import { RouteComponentProps } from "react-router-dom";
 import Link from '@material-ui/core/Link';
 import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
-import { GetTopicConfigsResult } from "../../shared/api";
-import { ConfigEntries } from "kafkajs";
+import { GetTopicConfigsResult, ConfigEntry } from "../../shared/api";
 import { CancelToken, Loader } from "../common/loader";
 
 type State = {
     loading: boolean;
     error?: string;
-    rows: ConfigEntries[];
+    rows: ConfigEntry[];
     data?: GetTopicConfigsResult;
 }
 
 export interface TopicConfigLinkProps {
-    data: { configName: string };
+    data: { name: string };
 }
 
 const TopicConfigLink: React.FunctionComponent<TopicConfigLinkProps> = (props) => {
     return (
-    <Link rel="noopener noreferrer" color="primary" target="_blank" href={`https://docs.confluent.io/current/installation/configuration/topic-configs.html#${props.data.configName}`}>
-                {props.data.configName}
+    <Link rel="noopener noreferrer" color="primary" target="_blank" href={`https://docs.confluent.io/current/installation/configuration/topic-configs.html#${props.data.name}`}>
+                {props.data.name}
     </Link>)
 }
 
@@ -53,17 +52,18 @@ export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: s
             this.setState({loading: false, error: data.error })
             return
         }
-        const results = data.resources[0].configEntries
+        const results = data.entries
         this.setState({ data, loading: false, rows: results })
     }
 
     getColumnDefs() {
         return [
-            { headerName: "Name", field: "configName", cellRendererFramework: TopicConfigLink },
-            { headerName: "Value", field: "configValue" },
-            { headerName: "Readonly", field: "readOnly" },
-            { headerName: "Is Default", field: "isDefault"},
-            { headerName: "Is Sensitive", field: "isSensitive"},
+            { headerName: "Name", field: "name", cellRendererFramework: TopicConfigLink },
+            { headerName: "Value", field: "value" },
+            { headerName: "Readonly", field: "is_read_only" },
+            { headerName: "Is Default", field: "is_default"},
+            { headerName: "Is Sensitive", field: "is_sensitive"},
+            { headerName: "Source", field: "source"},
         ]
     }
 
@@ -78,9 +78,9 @@ export class TopicConfigs extends React.Component<RouteComponentProps<{ topic: s
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
                 <ErrorMsg error={this.state.error} prefix="Failed to fetch configs. Error: "></ErrorMsg>
                 {!this.state.loading && <DataView
-                    search={(r: ConfigEntries) => r.configName}
+                    search={(r: ConfigEntry) => r.name}
                     rows={this.state.rows}
-                    raw={this.state.data?.resources ?? []}
+                    raw={this.state.data?.entries ?? []}
                     url={this.url}
                     columnDefs={this.getColumnDefs()}>
                 </DataView>}

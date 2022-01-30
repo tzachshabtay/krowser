@@ -7,8 +7,8 @@ import { CellProps, CellButton } from '../common/cell_button';
 import { GridApi, ColumnApi, GridReadyEvent } from 'ag-grid-community';
 import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
-import { GetTopicResult, GetTopicsResult, TopicConsumerGroups, TopicOffsets, TopicsOffsets } from "../../shared/api";
-import { DescribeConfigResponse, ITopicMetadata } from "kafkajs";
+import { GetTopicResult, GetTopicsResult, TopicsOffsets } from "../../shared/api";
+import { ITopicMetadata } from "kafkajs";
 import { History } from 'history';
 import { CancelToken, Loader } from "../common/loader";
 

@@ -38,5 +38,6 @@ fn rocket() -> _ {
         kafka::get_messages,
         kafka::get_topic,
         kafka::get_topic_consumer_groups,
+        kafka::get_topic_configs,
     ])
 }

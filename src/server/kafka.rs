@@ -1,3 +1,7 @@
+use rdkafka::admin::ConfigResourceResult;
+use rdkafka::admin::ResourceSpecifier;
+use rdkafka::admin::AdminOptions;
+use rdkafka::client::DefaultClientContext;
 use rocket::serde::json::Json;
 use rocket::serde::{Serialize, Deserialize};
 
@@ -10,6 +14,7 @@ use rdkafka::message::Timestamp;
 use rdkafka::consumer::StreamConsumer;
 use rdkafka::TopicPartitionList;
 use rdkafka::config::ClientConfig;
+use rdkafka::admin::AdminClient;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::error::{KafkaResult};
 
@@ -81,6 +86,21 @@ pub struct GetTopicResult {
 #[derive(Serialize)]
 pub struct GetTopicConsumerGroupsResult {
     consumer_groups: Vec<TopicConsumerGroup>
+}
+
+#[derive(Serialize)]
+pub struct ConfigEntry {
+    name: String,
+    value: Option<String>,
+    source: String,
+    is_read_only: bool,
+    is_default: bool,
+    is_sensitive: bool,
+}
+
+#[derive(Serialize)]
+pub struct GetTopicConfigsResult {
+    entries: Vec<ConfigEntry>
 }
 
 #[derive(Serialize)]
@@ -189,6 +209,42 @@ pub fn get_topic(topic: &str) -> Result<Json<GetTopicResult>, String> {
         offsets: offsets,
         consumer_groups: groups,
     }))
+}
+
+#[get("/api/topic/<topic>/config")]
+pub async fn get_topic_configs(topic: &str) -> Result<Json<GetTopicConfigsResult>, String> {
+    let client: AdminClient<DefaultClientContext> = map_error(ClientConfig::new()
+        .set("bootstrap.servers", &*config::KAFKA_URLS).create())?;
+
+    let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(5)));
+    let configs: Vec<ConfigResourceResult> = map_error(client.describe_configs(&[
+        ResourceSpecifier::Topic(topic),
+    ], &opts).await)?;
+
+    if configs.len() == 0 {
+        return Err("no configs found".to_string());
+    }
+    if configs.len() > 1 {
+        return Err("too many configs found".to_string());
+    }
+    let config = map_error(configs[0].as_ref())?;
+
+    let mut entries = Vec::with_capacity(config.entries.len());
+    for entry in &config.entries {
+        entries.push(ConfigEntry{
+            name: entry.name.to_string(),
+            value: match &entry.value {
+                Some(val) => Some(val.to_string()),
+                None => None,
+            },
+            source: format!("{:?}", entry.source),
+            is_read_only: entry.is_read_only,
+            is_default: entry.is_default,
+            is_sensitive: entry.is_sensitive,
+        });
+    }
+
+    Ok(Json(GetTopicConfigsResult{ entries: entries }))
 }
 
 #[get("/api/topic/<topic>/consumer_groups")]

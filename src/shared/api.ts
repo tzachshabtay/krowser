@@ -10,10 +10,11 @@ export type TopicConsumerGroups = Array<{group_id: string, offsets: ConsumerOffs
 export type TopicMessage = { topic: string, partition: number, value: string, key: string, timestamp: number, offset: number, schema_type: string | undefined }
 export type TopicMessages = { messages: TopicMessage[], hasTimeout: boolean }
 export type Broker = { nodeId: number; host: string; port: number }
+export type ConfigEntry = { name: string, value?: string, source: string, is_read_only: boolean, is_default: boolean, is_sensitive: boolean}
 
 export type GetTopicsResult = MaybeError & { topics: ITopicMetadata[] }
 export type GetTopicOffsetsResult = MaybeError & { offsets: TopicsOffsets }
-export type GetTopicConfigsResult = MaybeError & DescribeConfigResponse
+export type GetTopicConfigsResult = MaybeError & { entries: ConfigEntry[] }
 export type GetBrokerConfigsResult = MaybeError & DescribeConfigResponse
 export type GetTopicConsumerGroupsResult = MaybeError & { consumer_groups: TopicConsumerGroups }
 export type GetTopicResult = MaybeError & { offsets: TopicsOffsets, consumer_groups?: TopicConsumerGroups}
