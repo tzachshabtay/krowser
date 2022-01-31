@@ -7,8 +7,7 @@ import { CellProps, CellButton } from '../common/cell_button';
 import { GridApi, ColumnApi, GridReadyEvent } from 'ag-grid-community';
 import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
-import { GetTopicResult, GetTopicsResult, TopicsOffsets } from "../../shared/api";
-import { ITopicMetadata } from "kafkajs";
+import { GetTopicResult, GetTopicsResult, TopicsOffsets, TopicMetadata } from "../../shared/api";
 import { History } from 'history';
 import { CancelToken, Loader } from "../common/loader";
 
@@ -46,7 +45,7 @@ class ViewMessagesButton extends React.Component<CellProps, {}> {
 type Topic = {
     topic: string,
     num_partitions: number,
-    raw: ITopicMetadata,
+    raw: TopicMetadata,
     history: History<unknown>,
     offsets?: TopicsOffsets,
     groups?: string[],
@@ -86,7 +85,7 @@ export class Topics extends React.Component<RouteComponentProps, State> {
             this.setState({loading: false, error: data.error, errorPrefix: "Failed to fetch topics. Error: "})
             return
         }
-        const results: Topic[] = data.topics.map((r: ITopicMetadata) => (
+        const results: Topic[] = data.topics.map((r: TopicMetadata) => (
             { topic: r.name, num_partitions: r.partitions.length, raw: r, history: this.props.history }))
         this.setState({ loading: false, rows: results })
         for (const topic of results) {

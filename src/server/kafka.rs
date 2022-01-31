@@ -1,10 +1,10 @@
+use rocket::serde::json::Json;
+use rocket::serde::{Serialize, Deserialize};
+
 use rdkafka::admin::ConfigResourceResult;
 use rdkafka::admin::ResourceSpecifier;
 use rdkafka::admin::AdminOptions;
 use rdkafka::client::DefaultClientContext;
-use rocket::serde::json::Json;
-use rocket::serde::{Serialize, Deserialize};
-
 use rdkafka::message::Message;
 use rdkafka::error::KafkaError;
 use rdkafka::ClientContext;
@@ -42,6 +42,13 @@ pub struct PartitionMetadata {
 }
 
 #[derive(Serialize)]
+pub struct BrokerMetadata {
+    id: i32,
+    host: String,
+    port: i32,
+}
+
+#[derive(Serialize)]
 pub struct TopicMetadata {
     name: String,
     partitions: Vec<PartitionMetadata>,
@@ -50,6 +57,11 @@ pub struct TopicMetadata {
 #[derive(Serialize)]
 pub struct GetTopicsResult {
     topics: Vec<TopicMetadata>,
+}
+
+#[derive(Serialize)]
+pub struct GetClusterResult {
+    brokers: Vec<BrokerMetadata>,
 }
 
 #[derive(Serialize, Copy, Clone)]
@@ -102,6 +114,12 @@ pub struct ConfigEntry {
 pub struct GetTopicConfigsResult {
     entries: Vec<ConfigEntry>
 }
+
+#[derive(Serialize)]
+pub struct GetBrokerConfigsResult {
+    entries: Vec<ConfigEntry>
+}
+
 
 #[derive(Serialize)]
 pub struct TopicMessage {
@@ -221,6 +239,64 @@ pub async fn get_topic_configs(topic: &str) -> Result<Json<GetTopicConfigsResult
         ResourceSpecifier::Topic(topic),
     ], &opts).await)?;
 
+    let entries = _get_entries(configs)?;
+
+    Ok(Json(GetTopicConfigsResult{ entries: entries }))
+}
+
+#[get("/api/broker/<broker>/config")]
+pub async fn get_broker_configs(broker: i32) -> Result<Json<GetBrokerConfigsResult>, String> {
+    let client: AdminClient<DefaultClientContext> = map_error(ClientConfig::new()
+        .set("bootstrap.servers", &*config::KAFKA_URLS).create())?;
+
+    let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(5)));
+    let configs: Vec<ConfigResourceResult> = map_error(client.describe_configs(&[
+        ResourceSpecifier::Broker(broker),
+    ], &opts).await)?;
+
+    let entries = _get_entries(configs)?;
+
+    Ok(Json(GetBrokerConfigsResult{ entries: entries }))
+}
+
+#[get("/api/cluster")]
+pub fn get_cluster() -> Result<Json<GetClusterResult>, String> {
+    let consumer: BaseConsumer = map_error(ClientConfig::new()
+        .set("bootstrap.servers", &*config::KAFKA_URLS)
+        .create())?;
+
+    let timeout = Duration::from_secs(10);
+    let metadata = map_error(consumer
+        .fetch_metadata(None, timeout))?;
+
+    let mut brokers = Vec::with_capacity(metadata.brokers().len());
+    for broker in metadata.brokers() {
+        brokers.push(BrokerMetadata{
+            id: broker.id(),
+            host: broker.host().to_owned(),
+            port: broker.port(),
+        })
+    }
+
+    Ok(Json(GetClusterResult{ brokers: brokers }))
+}
+
+#[get("/api/topic/<topic>/consumer_groups")]
+pub fn get_topic_consumer_groups(topic: &str) -> Result<Json<GetTopicConsumerGroupsResult>, String> {
+    let offsets = _get_offsets(topic)?;
+    let groups = _get_topic_consumer_groups(topic, &offsets, true)?;
+    Ok(Json(GetTopicConsumerGroupsResult{consumer_groups: groups}))
+}
+
+#[get("/api/topic/<topic>/offsets")]
+pub fn get_offsets(topic: &str) -> Result<Json<GetTopicOffsetsResult>, String> {
+    let offsets = _get_offsets(topic)?;
+    Ok(Json(GetTopicOffsetsResult{
+        offsets: offsets,
+    }))
+}
+
+fn _get_entries(configs: Vec<ConfigResourceResult>) -> Result<Vec<ConfigEntry>, String> {
     if configs.len() == 0 {
         return Err("no configs found".to_string());
     }
@@ -244,22 +320,7 @@ pub async fn get_topic_configs(topic: &str) -> Result<Json<GetTopicConfigsResult
         });
     }
 
-    Ok(Json(GetTopicConfigsResult{ entries: entries }))
-}
-
-#[get("/api/topic/<topic>/consumer_groups")]
-pub fn get_topic_consumer_groups(topic: &str) -> Result<Json<GetTopicConsumerGroupsResult>, String> {
-    let offsets = _get_offsets(topic)?;
-    let groups = _get_topic_consumer_groups(topic, &offsets, true)?;
-    Ok(Json(GetTopicConsumerGroupsResult{consumer_groups: groups}))
-}
-
-#[get("/api/topic/<topic>/offsets")]
-pub fn get_offsets(topic: &str) -> Result<Json<GetTopicOffsetsResult>, String> {
-    let offsets = _get_offsets(topic)?;
-    Ok(Json(GetTopicOffsetsResult{
-        offsets: offsets,
-    }))
+    Ok(entries)
 }
 
 fn _get_offsets(topic: &str) -> Result<Vec<TopicOffsets>, String> {
