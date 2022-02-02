@@ -18,7 +18,7 @@ type State = {
 
 class ViewMembersButton extends React.Component<CellProps, {}> {
     render() {
-        return <CellButton getUrl={() => `/members/${this.props.data.groupId}`} {...this.props} />
+        return <CellButton getUrl={() => `/members/${this.props.data.name}`} {...this.props} />
     }
 }
 

@@ -6,15 +6,17 @@ import { DataView} from '../common/data_view';
 import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
 import { CancelToken, Loader } from "../common/loader";
+import { GetGroupMembersResult, GroupMemberMetadata } from "../../shared/api";
 
 type State = {
     loading: boolean;
     error: any;
-    rows: any[];
+    rows: GroupMemberMetadata[];
+    data: GetGroupMembersResult;
 }
 
 export class Members extends React.Component<RouteComponentProps<{ group: string }>, State> {
-    state: State = { loading: true, rows: [], error: "" }
+    state: State = { loading: true, rows: [], error: "", data: {members: []} }
     url: Url;
     loader: Loader = new Loader()
 
@@ -32,20 +34,22 @@ export class Members extends React.Component<RouteComponentProps<{ group: string
     }
 
     fetchMembers = async (cancelToken: CancelToken) => {
-        const data = await cancelToken.Fetch(`/api/members/${this.props.match.params.group}`)
+        const data: GetGroupMembersResult = await cancelToken.Fetch(`/api/members/${this.props.match.params.group}`)
         if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({loading: false, error: data.error })
             return
         }
-        this.setState({ loading: false, rows: data })
+        this.setState({ loading: false, rows: data.members, data: data })
     }
 
     getColumnDefs() {
         return [
-            { headerName: "Member ID", field: "memberId" },
-            { headerName: "Client ID", field: "clientId" },
-            { headerName: "Client Host", field: "clientHost" },
+            { headerName: "Member ID", field: "member_id" },
+            { headerName: "Client ID", field: "client_id" },
+            { headerName: "Client Host", field: "client_host" },
+            { headerName: "Assignment", field: "assignment" },
+            { headerName: "Metadata", field: "metadata" },
         ]
     }
 
@@ -62,7 +66,7 @@ export class Members extends React.Component<RouteComponentProps<{ group: string
                 {!this.state.loading && <DataView
                     search={r => `${r.memberId},${r.clientId},${r.clientHost}`}
                     rows={this.state.rows}
-                    raw={this.state.rows}
+                    raw={this.state.data.members}
                     url={this.url}
                     columnDefs={this.getColumnDefs()}>
                 </DataView>}

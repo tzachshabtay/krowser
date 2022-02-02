@@ -124,6 +124,11 @@ pub struct GetGroupsResult {
 }
 
 #[derive(Serialize)]
+pub struct GetGroupMembersResult {
+    members: Vec<GroupMemberMetadata>
+}
+
+#[derive(Serialize)]
 pub struct ConfigEntry {
     name: String,
     value: Option<String>,
@@ -316,31 +321,7 @@ pub fn get_groups() -> Result<Json<GetGroupsResult>, String> {
     let groups = groups.groups();
     let mut out = Vec::with_capacity(groups.len());
     for group in groups {
-        let mut members = Vec::with_capacity(group.members().len());
-        for member in group.members() {
-            let assignment = match member.assignment() {
-                None => "",
-                Some(assgn) => match std::str::from_utf8(assgn) {
-                    Ok(v) => v,
-                    Err(_) => "Non-Utf8",
-                }
-            };
-            let meta = match member.metadata() {
-                None => "",
-                Some(data) => match std::str::from_utf8(data) {
-                    Ok(v) => v,
-                    Err(_) => "Non-Utf8",
-                }
-            };
-            members.push(
-                GroupMemberMetadata{
-                    member_id: member.id().to_string(),
-                    client_id: member.client_id().to_string(),
-                    client_host: member.client_host().to_string(),
-                    metadata: meta.to_string(),
-                    assignment: assignment.to_string(),
-                })
-        }
+        let members = _get_members(&group);
         out.push(
             GroupMetadata{
                 name: group.name().to_string(),
@@ -353,6 +334,29 @@ pub fn get_groups() -> Result<Json<GetGroupsResult>, String> {
     }
 
     Ok(Json(GetGroupsResult{groups: out}))
+}
+
+#[get("/api/members/<group>")]
+pub fn get_group_members(group: &str) -> Result<Json<GetGroupMembersResult>, String> {
+    let consumer: BaseConsumer = map_error(ClientConfig::new()
+    .set("bootstrap.servers", &*config::KAFKA_URLS)
+    .create())?;
+
+    let timeout = Duration::from_secs(10);
+    let groups = map_error(consumer
+        .fetch_group_list(Some(group), timeout))?;
+    let groups = groups.groups();
+
+    if groups.len() == 0 {
+        return Err("no groups found".to_string());
+    }
+    if groups.len() > 1 {
+        return Err("too many groups found".to_string());
+    }
+    let group = &groups[0];
+    let members = _get_members(&group);
+
+    Ok(Json(GetGroupMembersResult{members: members}))
 }
 
 #[get("/api/topic/<topic>/consumer_groups")]
@@ -368,6 +372,35 @@ pub fn get_offsets(topic: &str) -> Result<Json<GetTopicOffsetsResult>, String> {
     Ok(Json(GetTopicOffsetsResult{
         offsets: offsets,
     }))
+}
+
+fn _get_members(group: &rdkafka::groups::GroupInfo) -> Vec<GroupMemberMetadata> {
+    let mut members = Vec::with_capacity(group.members().len());
+    for member in group.members() {
+        let assignment = match member.assignment() {
+            None => "",
+            Some(assgn) => match std::str::from_utf8(assgn) {
+                Ok(v) => v,
+                Err(_) => "Non-Utf8",
+            }
+        };
+        let meta = match member.metadata() {
+            None => "",
+            Some(data) => match std::str::from_utf8(data) {
+                Ok(v) => v,
+                Err(_) => "Non-Utf8",
+            }
+        };
+        members.push(
+            GroupMemberMetadata{
+                member_id: member.id().to_string(),
+                client_id: member.client_id().to_string(),
+                client_host: member.client_host().to_string(),
+                metadata: meta.to_string(),
+                assignment: assignment.to_string(),
+            })
+    }
+    members
 }
 
 fn _get_entries(configs: Vec<ConfigResourceResult>) -> Result<Vec<ConfigEntry>, String> {

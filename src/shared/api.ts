@@ -26,6 +26,7 @@ export type GetClusterResult = MaybeError & { brokers: Array<Broker> }
 export type GetTopicOffsetsByTimestapResult = MaybeError & SeekEntry[]
 export type GetTopicMessagesResult = MaybeError & TopicMessages
 export type GetGroupsResult = MaybeError & { groups: GroupMetadata[] }
+export type GetGroupMembersResult = MaybeError & { members: GroupMemberMetadata[] }
 
 export type GetSubjectsResult = MaybeError & string[]
 export type GetSubjectVersionsResult = MaybeError & number[]
