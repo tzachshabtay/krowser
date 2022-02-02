@@ -13,6 +13,8 @@ export type TopicMessage = { topic: string, partition: number, value: string, ke
 export type TopicMessages = { messages: TopicMessage[], hasTimeout: boolean }
 export type Broker = { id: number; host: string; port: number }
 export type ConfigEntry = { name: string, value?: string, source: string, is_read_only: boolean, is_default: boolean, is_sensitive: boolean}
+export type GroupMemberMetadata = { member_id: string, client_id: string, client_host: string, metadata: string, assignment: string}
+export type GroupMetadata = { name: string, protocol: string, protocol_type: string, state: string, members: GroupMemberMetadata[]}
 
 export type GetTopicsResult = MaybeError & { topics: TopicMetadata[] }
 export type GetTopicOffsetsResult = MaybeError & { offsets: TopicsOffsets }
@@ -23,6 +25,7 @@ export type GetTopicResult = MaybeError & { offsets: TopicsOffsets, consumer_gro
 export type GetClusterResult = MaybeError & { brokers: Array<Broker> }
 export type GetTopicOffsetsByTimestapResult = MaybeError & SeekEntry[]
 export type GetTopicMessagesResult = MaybeError & TopicMessages
+export type GetGroupsResult = MaybeError & { groups: GroupMetadata[] }
 
 export type GetSubjectsResult = MaybeError & string[]
 export type GetSubjectVersionsResult = MaybeError & number[]

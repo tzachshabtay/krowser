@@ -41,5 +41,6 @@ fn rocket() -> _ {
         kafka::get_topic_configs,
         kafka::get_broker_configs,
         kafka::get_cluster,
+        kafka::get_groups,
     ])
 }

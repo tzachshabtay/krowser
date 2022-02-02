@@ -101,6 +101,29 @@ pub struct GetTopicConsumerGroupsResult {
 }
 
 #[derive(Serialize)]
+pub struct GroupMemberMetadata {
+    member_id: String,
+    client_id: String,
+    client_host: String,
+    metadata: String,
+    assignment: String,
+}
+
+#[derive(Serialize)]
+pub struct GroupMetadata {
+    name: String,
+    protocol: String,
+    protocol_type: String,
+    state: String,
+    members: Vec<GroupMemberMetadata>
+}
+
+#[derive(Serialize)]
+pub struct GetGroupsResult {
+    groups: Vec<GroupMetadata>
+}
+
+#[derive(Serialize)]
 pub struct ConfigEntry {
     name: String,
     value: Option<String>,
@@ -119,7 +142,6 @@ pub struct GetTopicConfigsResult {
 pub struct GetBrokerConfigsResult {
     entries: Vec<ConfigEntry>
 }
-
 
 #[derive(Serialize)]
 pub struct TopicMessage {
@@ -279,6 +301,58 @@ pub fn get_cluster() -> Result<Json<GetClusterResult>, String> {
     }
 
     Ok(Json(GetClusterResult{ brokers: brokers }))
+}
+
+#[get("/api/groups")]
+pub fn get_groups() -> Result<Json<GetGroupsResult>, String> {
+    let consumer: BaseConsumer = map_error(ClientConfig::new()
+    .set("bootstrap.servers", &*config::KAFKA_URLS)
+    .create())?;
+
+    let timeout = Duration::from_secs(10);
+    let groups = map_error(consumer
+        .fetch_group_list(None, timeout))?;
+
+    let groups = groups.groups();
+    let mut out = Vec::with_capacity(groups.len());
+    for group in groups {
+        let mut members = Vec::with_capacity(group.members().len());
+        for member in group.members() {
+            let assignment = match member.assignment() {
+                None => "",
+                Some(assgn) => match std::str::from_utf8(assgn) {
+                    Ok(v) => v,
+                    Err(_) => "Non-Utf8",
+                }
+            };
+            let meta = match member.metadata() {
+                None => "",
+                Some(data) => match std::str::from_utf8(data) {
+                    Ok(v) => v,
+                    Err(_) => "Non-Utf8",
+                }
+            };
+            members.push(
+                GroupMemberMetadata{
+                    member_id: member.id().to_string(),
+                    client_id: member.client_id().to_string(),
+                    client_host: member.client_host().to_string(),
+                    metadata: meta.to_string(),
+                    assignment: assignment.to_string(),
+                })
+        }
+        out.push(
+            GroupMetadata{
+                name: group.name().to_string(),
+                protocol: group.protocol().to_string(),
+                protocol_type: group.protocol_type().to_string(),
+                state: group.state().to_string(),
+                members: members,
+            }
+        );
+    }
+
+    Ok(Json(GetGroupsResult{groups: out}))
 }
 
 #[get("/api/topic/<topic>/consumer_groups")]

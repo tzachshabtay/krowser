@@ -7,11 +7,13 @@ import { DataView} from '../common/data_view';
 import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
 import { CancelToken, Loader } from "../common/loader";
+import { GetGroupsResult, GroupMetadata } from "../../shared/api";
 
 type State = {
     loading: boolean;
     error: any;
-    rows: any[];
+    rows: GroupMetadata[];
+    data: GetGroupsResult;
 }
 
 class ViewMembersButton extends React.Component<CellProps, {}> {
@@ -21,7 +23,7 @@ class ViewMembersButton extends React.Component<CellProps, {}> {
 }
 
 export class Groups extends React.Component<RouteComponentProps, State> {
-    state: State = { loading: true, rows: [], error: "" }
+    state: State = { loading: true, rows: [], error: "", data: {groups: []} }
     url: Url;
     loader: Loader = new Loader()
 
@@ -39,7 +41,7 @@ export class Groups extends React.Component<RouteComponentProps, State> {
     }
 
     fetchGroups = async (cancelToken: CancelToken) => {
-        const data = await cancelToken.Fetch(`/api/groups`)
+        const data: GetGroupsResult = await cancelToken.Fetch(`/api/groups`)
         if (cancelToken.Aborted) return
         if (data.error) {
             this.setState({loading: false, error: data.error})
@@ -48,14 +50,14 @@ export class Groups extends React.Component<RouteComponentProps, State> {
         const results = data.groups.map((r: any) => {
             return { numMembers: r.members.length, raw: r, history: this.props.history, ...r }
         })
-        this.setState({ loading: false, rows: results })
+        this.setState({ loading: false, rows: results, data })
     }
 
     getColumnDefs() {
         return [
-            { headerName: "Group ID", field: "groupId" },
+            { headerName: "Group ID", field: "name" },
             { headerName: "Protocol", field: "protocol" },
-            { headerName: "Protocol Type", field: "protocolType" },
+            { headerName: "Protocol Type", field: "protocol_type" },
             { headerName: "State", field: "state" },
             { headerName: "#Members", field: "numMembers", filter: "agNumberColumnFilter", cellRendererFramework: ViewMembersButton }
         ]
@@ -74,7 +76,7 @@ export class Groups extends React.Component<RouteComponentProps, State> {
                 {!this.state.loading && <DataView
                     search={r => `${r.groupId},${r.protocol},${r.protocolType}`}
                     rows={this.state.rows}
-                    raw={this.state.rows.map(r => r.raw)}
+                    raw={this.state.data.groups}
                     url={this.url}
                     columnDefs={this.getColumnDefs()}>
                 </DataView>}
