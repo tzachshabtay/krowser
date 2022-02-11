@@ -165,6 +165,11 @@ pub struct GetTopicMessagesResult {
     has_timeout: bool,
 }
 
+#[derive(Serialize)]
+pub struct GetOffsetForTimestampResult {
+    offset: i64,
+}
+
 #[derive(Serialize, FromFormField, Debug)]
 pub enum SearchStyle {
     None,
@@ -372,6 +377,38 @@ pub fn get_offsets(topic: &str) -> Result<Json<GetTopicOffsetsResult>, String> {
     Ok(Json(GetTopicOffsetsResult{
         offsets: offsets,
     }))
+}
+
+#[get("/api/offset/<topic>/<partition>/<timestamp>")]
+pub fn get_offset_for_timestamp(topic: &str, partition: i32, timestamp: i64) -> Result<Json<GetOffsetForTimestampResult>, String> {
+    let consumer: BaseConsumer = map_error(ClientConfig::new()
+        .set("bootstrap.servers", &*config::KAFKA_URLS)
+        .set("group.id", "krowser")
+        .set("enable.auto.commit", "false")
+        .create())?;
+
+    let timeout = Duration::from_secs(10);
+
+    let mut assignment = TopicPartitionList::new();
+    map_error(assignment.add_partition_offset(topic, partition, rdkafka::Offset::Offset(timestamp)))?; // that's not a mistake, the librdkafka api actually takes a timestamp for the offset.
+
+    let offsets = map_error(consumer.offsets_for_times(assignment, timeout))?;
+    let partition_offsets = offsets.elements_for_topic(topic);
+    if partition_offsets.len() == 0 {
+        return Ok(Json(GetOffsetForTimestampResult{
+            offset: 0,
+        }));
+    }
+    if partition_offsets.len() > 1 {
+        return Err("found too many offsets".to_string());
+    }
+    let partition_offset = &partition_offsets[0];
+    if let rdkafka::Offset::Offset(offset) = partition_offset.offset() {
+        return Ok(Json(GetOffsetForTimestampResult{
+            offset: offset,
+        }));
+    }
+    Err(format!("bad offset type: {:?}", partition_offset.offset()))
 }
 
 fn _get_members(group: &rdkafka::groups::GroupInfo) -> Vec<GroupMemberMetadata> {

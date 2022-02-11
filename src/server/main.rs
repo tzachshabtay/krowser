@@ -43,5 +43,6 @@ fn rocket() -> _ {
         kafka::get_cluster,
         kafka::get_groups,
         kafka::get_group_members,
+        kafka::get_offset_for_timestamp,
     ])
 }
