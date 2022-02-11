@@ -65,9 +65,9 @@ export class Partitions extends React.Component<RouteComponentProps<{ topic: str
     getColumnDefs() {
         return [
             { headerName: "Partition", field: "partition", filter: "agNumberColumnFilter" },
-            { headerName: "Offset", field: "offset", filter: "agNumberColumnFilter" },
             { headerName: "Low", field: "low", filter: "agNumberColumnFilter" },
-            { headerName: "#Messages (High)", field: "high", filter: "agNumberColumnFilter", cellRendererFramework: ViewMessagesButton }
+            { headerName: "High", field: "high", filter: "agNumberColumnFilter" },
+            { headerName: "#Messages", field: "messages", valueGetter: (params: any) => params.data.high - params.data.low, filter: "agNumberColumnFilter", cellRendererFramework: ViewMessagesButton }
         ]
     }
 
