@@ -27,6 +27,7 @@ use serde_json::Value as JsonValue;
 use std::time::Duration;
 
 use futures::StreamExt;
+use tokio::time::timeout;
 
 use regex::Regex;
 
@@ -570,7 +571,7 @@ fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<TopicOffsets>, with_com
     Ok(topic_groups)
 }
 
-#[get("/api/messages/<topic>/<partition>?<limit>&<offset>&<search>&<search_style>&<timeout>&<trace>")]
+#[get("/api/messages/<topic>/<partition>?<limit>&<offset>&<search>&<search_style>&<timeout_millis>&<trace>")]
 pub async fn get_messages(
     topic: &str,
     partition: i32,
@@ -578,115 +579,130 @@ pub async fn get_messages(
     offset: Option<i64>,
     search: Option<&str>,
     search_style: Option<SearchStyle>,
-    timeout: Option<i32>,
+    timeout_millis: Option<u64>,
     trace: bool) -> Result<Json<GetTopicMessagesResult>, String> {
-        let mut limit = limit.unwrap_or(100);
-        let offset = offset.unwrap_or(0);
-        let timeout = timeout.unwrap_or(20000);
-        let search_style = search_style.unwrap_or(SearchStyle::None);
-        eprintln!("{:?} {:?} {}", search, search_style, timeout);
-        let regex: Option<Regex> = match search_style {
-            SearchStyle::Regex =>
-                if let Some(pattern) = &search
-                    { Some(map_error(Regex::new(pattern))?) } else
-                    { None },
-            _ => None,
-        };
-        let topic_offsets = get_offsets(topic)?;
-        let mut found_partition = false;
-        for offsets in &topic_offsets.offsets{
-            if offsets.partition != partition {
-                continue;
-            }
-            found_partition = true;
-            let max_offset =offsets.high;
-            if max_offset == 0 || offset > max_offset {
-                return Ok(Json(GetTopicMessagesResult{messages: Vec::new(), has_timeout: false}))
-            }
-            if offset + limit > max_offset {
-                limit = max_offset - offset
-            }
-            if limit <= 0 {
-                return Ok(Json(GetTopicMessagesResult{messages: Vec::new(), has_timeout: false}))
-            }
-            break;
+
+    let limit = limit.unwrap_or(100);
+    let offset = offset.unwrap_or(0);
+    let timeout_millis = timeout_millis.unwrap_or(20000);
+    let search_style = search_style.unwrap_or(SearchStyle::None);
+    eprintln!("{:?} {:?} {}", search, search_style, timeout_millis);
+    match timeout(Duration::from_millis(timeout_millis),
+        _get_messages(topic, partition, limit, offset, search, search_style, trace)).await {
+            Err(_) => Ok(Json(GetTopicMessagesResult{has_timeout: true, messages: Vec::new()})),
+            Ok(res) => res,
+    }
+}
+
+async fn _get_messages(topic: &str,
+    partition: i32,
+    mut limit: i64,
+    offset: i64,
+    search: Option<&str>,
+    search_style: SearchStyle,
+    trace: bool) -> Result<Json<GetTopicMessagesResult>, String> {
+    let regex: Option<Regex> = match search_style {
+        SearchStyle::Regex =>
+            if let Some(pattern) = &search
+                { Some(map_error(Regex::new(pattern))?) } else
+                { None },
+        _ => None,
+    };
+    let topic_offsets = get_offsets(topic)?;
+    let mut found_partition = false;
+    for offsets in &topic_offsets.offsets{
+        if offsets.partition != partition {
+            continue;
         }
-        if !found_partition {
-            return Err(format!("partition {} not found for topic {}", partition, topic))
+        found_partition = true;
+        let max_offset =offsets.high;
+        if max_offset == 0 || offset > max_offset {
+            return Ok(Json(GetTopicMessagesResult{messages: Vec::new(), has_timeout: false}))
         }
+        if offset + limit > max_offset {
+            limit = max_offset - offset
+        }
+        if limit <= 0 {
+            return Ok(Json(GetTopicMessagesResult{messages: Vec::new(), has_timeout: false}))
+        }
+        break;
+    }
+    if !found_partition {
+        return Err(format!("partition {} not found for topic {}", partition, topic))
+    }
 
-        let context = CustomContext;
+    let context = CustomContext;
 
-        println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
-        let consumer: LoggingConsumer = map_error(ClientConfig::new()
-            .set("bootstrap.servers", &*config::KAFKA_URLS)
-            .set("group.id", "krowser")
-            .set("enable.auto.commit", "false")
-            .create_with_context(context))?;
+    println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
+    let consumer: LoggingConsumer = map_error(ClientConfig::new()
+        .set("bootstrap.servers", &*config::KAFKA_URLS)
+        .set("group.id", "krowser")
+        .set("enable.auto.commit", "false")
+        .create_with_context(context))?;
 
-        let mut assignment = TopicPartitionList::new();
-        map_error(assignment.add_partition_offset(topic, partition, rdkafka::Offset::Offset(offset)))?;
-        map_error(consumer.assign(&assignment))?;
+    let mut assignment = TopicPartitionList::new();
+    map_error(assignment.add_partition_offset(topic, partition, rdkafka::Offset::Offset(offset)))?;
+    map_error(consumer.assign(&assignment))?;
 
-        let srs = SrSettings::new((&*config::SCHEMA_REGISTRY_URL).to_string());
-        let mut avro_decoder = AvroDecoder::new(srs);
+    let srs = SrSettings::new((&*config::SCHEMA_REGISTRY_URL).to_string());
+    let mut avro_decoder = AvroDecoder::new(srs);
 
-        let mut num_consumed = 0;
-        let mut messages = Vec::with_capacity(limit.try_into().unwrap());
+    let mut num_consumed = 0;
+    let mut messages = Vec::with_capacity(limit.try_into().unwrap());
 
-        let mut message_stream = consumer.stream();
-        while let Some(message) = message_stream.next().await {
-            num_consumed += 1;
-            match message {
-                Err(e) => eprintln!("Kafka error: {}", e),
-                Ok(m) => {
-                    let key = match m.key() {
-                        Some(k) => match std::str::from_utf8(k) {
-                            Ok(v) => v,
-                            Err(_) => "Non-Utf8",
-                        },
-                        None => "",
-                    };
-                    let timestamp = match m.timestamp() {
-                        Timestamp::NotAvailable => 0,
-                        Timestamp::CreateTime(v) => v,
-                        Timestamp::LogAppendTime(v) => v,
-                    };
-                    let decoded = decode(m.payload(), &mut avro_decoder).await?;
-                    if trace {
-                        eprintln!("key: '{:?}', value: {:?}, topic: {}, offset: {}, timestamp: {:?}",
-                            key, decoded.value, m.topic(), m.offset(), timestamp);
-                    }
-                    let mut filtered_out = false;
-                    if let Some(pattern) = search {
-                        let schema = *&decoded.schema.as_ref();
-                        let text = format!("{},{},{}", key.to_string(), decoded.value, schema.unwrap_or(&"".to_string()));
-                        if !includes(text, pattern.to_string(), &search_style, &regex) {
-                            filtered_out = true;
-                        }
-                    }
-                    if !filtered_out {
-                        let msg = TopicMessage{
-                            topic: topic.to_string(),
-                            partition: partition,
-                            key: key.to_owned(),
-                            timestamp: timestamp,
-                            offset: m.offset(),
-                            value: decoded.value,
-                            schema_type: decoded.schema,
-                        };
-                        messages.push(msg);
+    let mut message_stream = consumer.stream();
+    while let Some(message) = message_stream.next().await {
+        num_consumed += 1;
+        match message {
+            Err(e) => eprintln!("Kafka error: {}", e),
+            Ok(m) => {
+                let key = match m.key() {
+                    Some(k) => match std::str::from_utf8(k) {
+                        Ok(v) => v,
+                        Err(_) => "Non-Utf8",
+                    },
+                    None => "",
+                };
+                let timestamp = match m.timestamp() {
+                    Timestamp::NotAvailable => 0,
+                    Timestamp::CreateTime(v) => v,
+                    Timestamp::LogAppendTime(v) => v,
+                };
+                let decoded = decode(m.payload(), &mut avro_decoder).await?;
+                if trace {
+                    eprintln!("key: '{:?}', value: {:?}, topic: {}, offset: {}, timestamp: {:?}",
+                        key, decoded.value, m.topic(), m.offset(), timestamp);
+                }
+                let mut filtered_out = false;
+                if let Some(pattern) = search {
+                    let schema = *&decoded.schema.as_ref();
+                    let text = format!("{},{},{}", key.to_string(), decoded.value, schema.unwrap_or(&"".to_string()));
+                    if !includes(text, pattern.to_string(), &search_style, &regex) {
+                        filtered_out = true;
                     }
                 }
-            };
-            if num_consumed >= limit {
-                break;
+                if !filtered_out {
+                    let msg = TopicMessage{
+                        topic: topic.to_string(),
+                        partition: partition,
+                        key: key.to_owned(),
+                        timestamp: timestamp,
+                        offset: m.offset(),
+                        value: decoded.value,
+                        schema_type: decoded.schema,
+                    };
+                    messages.push(msg);
+                }
             }
+        };
+        if num_consumed >= limit {
+            break;
         }
-        Ok(Json(GetTopicMessagesResult{
-            messages: messages,
-            has_timeout: false,
-        }))
+    }
+    Ok(Json(GetTopicMessagesResult{
+        messages: messages,
+        has_timeout: false,
+    }))
 }
 
 struct DecodedValue {
