@@ -404,12 +404,21 @@ pub fn get_offset_for_timestamp(topic: &str, partition: i32, timestamp: i64) -> 
         return Err("found too many offsets".to_string());
     }
     let partition_offset = &partition_offsets[0];
-    if let rdkafka::Offset::Offset(offset) = partition_offset.offset() {
-        return Ok(Json(GetOffsetForTimestampResult{
+    match partition_offset.offset() {
+        rdkafka::Offset::Offset(offset) => Ok(Json(GetOffsetForTimestampResult{
             offset: offset,
-        }));
+        })),
+        rdkafka::Offset::End => {
+            let topic_offsets = _get_offsets(topic)?;
+            if let Some(partition_offsets) = topic_offsets.iter().find(|v| v.partition == partition) {
+                return Ok(Json(GetOffsetForTimestampResult{
+                    offset: partition_offsets.high,
+                }));
+            }
+            return Err("missing end offset".to_string());
+        },
+        _ => Err(format!("bad offset type: {:?}", partition_offset.offset()))
     }
-    Err(format!("bad offset type: {:?}", partition_offset.offset()))
 }
 
 fn _get_members(group: &rdkafka::groups::GroupInfo) -> Vec<GroupMemberMetadata> {
