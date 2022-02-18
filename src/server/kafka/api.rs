@@ -1,22 +1,23 @@
+use rdkafka::Message;
 use rocket::serde::json::Json;
-use rocket::serde::{Serialize, Deserialize};
 
 use rdkafka::admin::ConfigResourceResult;
 use rdkafka::admin::ResourceSpecifier;
 use rdkafka::admin::AdminOptions;
 use rdkafka::client::DefaultClientContext;
-use rdkafka::message::Message;
-use rdkafka::error::KafkaError;
-use rdkafka::ClientContext;
-use rdkafka::consumer::Rebalance;
-use rdkafka::consumer::ConsumerContext;
 use rdkafka::message::Timestamp;
-use rdkafka::consumer::StreamConsumer;
 use rdkafka::TopicPartitionList;
 use rdkafka::config::ClientConfig;
 use rdkafka::admin::AdminClient;
 use rdkafka::consumer::{BaseConsumer, Consumer};
+use rdkafka::error::KafkaError;
+use rdkafka::ClientContext;
+use rdkafka::consumer::Rebalance;
+use rdkafka::consumer::ConsumerContext;
+use rdkafka::consumer::StreamConsumer;
 use rdkafka::error::{KafkaResult};
+
+use futures::StreamExt;
 
 use schema_registry_converter::async_impl::schema_registry::SrSettings;
 use schema_registry_converter::async_impl::avro::AvroDecoder;
@@ -26,165 +27,12 @@ use serde_json::Value as JsonValue;
 
 use std::time::Duration;
 
-use futures::StreamExt;
 use tokio::time::timeout;
 
 use regex::Regex;
 
 use crate::config;
-
-#[derive(PartialEq, Serialize, Deserialize, Debug, Clone)]
-pub struct PartitionMetadata {
-    error_description: Option<String>,
-    partition_id: i32,
-    leader: i32,
-    replicas: Vec<i32>,
-    isr: Vec<i32>,
-}
-
-#[derive(Serialize)]
-pub struct BrokerMetadata {
-    id: i32,
-    host: String,
-    port: i32,
-}
-
-#[derive(Serialize)]
-pub struct TopicMetadata {
-    name: String,
-    partitions: Vec<PartitionMetadata>,
-}
-
-#[derive(Serialize)]
-pub struct GetTopicsResult {
-    topics: Vec<TopicMetadata>,
-}
-
-#[derive(Serialize)]
-pub struct GetClusterResult {
-    brokers: Vec<BrokerMetadata>,
-}
-
-#[derive(Serialize, Copy, Clone)]
-pub struct TopicOffsets {
-    partition: i32,
-    high: i64,
-    low: i64,
-}
-
-#[derive(Serialize)]
-pub struct ConsumerGroupOffsets {
-    metadata: Option<String>,
-    offset: i64,
-    partition_offsets: TopicOffsets,
-}
-
-#[derive(Serialize)]
-pub struct TopicConsumerGroup {
-    group_id: String,
-    offsets: Vec<ConsumerGroupOffsets>,
-}
-
-#[derive(Serialize)]
-pub struct GetTopicOffsetsResult {
-    offsets: Vec<TopicOffsets>
-}
-
-#[derive(Serialize)]
-pub struct GetTopicResult {
-    offsets: Vec<TopicOffsets>,
-    consumer_groups: Vec<TopicConsumerGroup>
-}
-
-#[derive(Serialize)]
-pub struct GetTopicConsumerGroupsResult {
-    consumer_groups: Vec<TopicConsumerGroup>
-}
-
-#[derive(Serialize)]
-pub struct GroupMemberMetadata {
-    member_id: String,
-    client_id: String,
-    client_host: String,
-    metadata: String,
-    assignment: String,
-}
-
-#[derive(Serialize)]
-pub struct GroupMetadata {
-    name: String,
-    protocol: String,
-    protocol_type: String,
-    state: String,
-    members: Vec<GroupMemberMetadata>
-}
-
-#[derive(Serialize)]
-pub struct GetGroupsResult {
-    groups: Vec<GroupMetadata>
-}
-
-#[derive(Serialize)]
-pub struct GetGroupMembersResult {
-    members: Vec<GroupMemberMetadata>
-}
-
-#[derive(Serialize)]
-pub struct ConfigEntry {
-    name: String,
-    value: Option<String>,
-    source: String,
-    is_read_only: bool,
-    is_default: bool,
-    is_sensitive: bool,
-}
-
-#[derive(Serialize)]
-pub struct GetTopicConfigsResult {
-    entries: Vec<ConfigEntry>
-}
-
-#[derive(Serialize)]
-pub struct GetBrokerConfigsResult {
-    entries: Vec<ConfigEntry>
-}
-
-#[derive(Serialize)]
-pub struct TopicMessage {
-    topic: String,
-    partition: i32,
-    value: String,
-    key: String,
-    schema_type: Option<String>,
-    timestamp: i64,
-    offset: i64,
-}
-
-#[derive(Serialize)]
-pub struct GetTopicMessagesResult {
-    messages: Vec<TopicMessage>,
-    has_timeout: bool,
-}
-
-#[derive(Serialize)]
-pub struct GetOffsetForTimestampResult {
-    offset: i64,
-}
-
-#[derive(Serialize, FromFormField, Debug)]
-pub enum SearchStyle {
-    None,
-    #[field(value = "case-sensitive")]
-    CaseSensitive,
-    Regex,
-}
-
-fn map_error<T, E: std::fmt::Debug>(result: Result<T, E>) -> Result<T, String> {
-    match result {
-        Ok(v) => Ok(v),
-        Err(e) => Err(format!("{:?}", e)),
-    }
-}
+use crate::kafka::dto;
 
 struct CustomContext;
 
@@ -215,8 +63,15 @@ impl ConsumerContext for CustomContext {
 
 type LoggingConsumer = StreamConsumer<CustomContext>;
 
+fn map_error<T, E: std::fmt::Debug>(result: Result<T, E>) -> Result<T, String> {
+    match result {
+        Ok(v) => Ok(v),
+        Err(e) => Err(format!("{:?}", e)),
+    }
+}
+
 #[get("/api/topics")]
-pub fn get_topics() -> Result<Json<GetTopicsResult>, String> {
+pub fn get_topics() -> Result<Json<dto::GetTopicsResult>, String> {
     println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
     let consumer: BaseConsumer = map_error(ClientConfig::new()
         .set("bootstrap.servers", &*config::KAFKA_URLS)
@@ -234,7 +89,7 @@ pub fn get_topics() -> Result<Json<GetTopicsResult>, String> {
                 Some(e) => Some(format!("{:?}", e)),
                 None => None,
             };
-            partitions.push(PartitionMetadata{
+            partitions.push(dto::PartitionMetadata{
                 error_description: err_desc,
                 partition_id: partition.id(),
                 leader: partition.leader(),
@@ -242,28 +97,28 @@ pub fn get_topics() -> Result<Json<GetTopicsResult>, String> {
                 isr: partition.isr().to_owned(),
             });
         }
-        topics.push(TopicMetadata{
+        topics.push(dto::TopicMetadata{
             name: topic.name().to_owned(),
             partitions: partitions,
         })
     }
-    Ok(Json(GetTopicsResult{
+    Ok(Json(dto::GetTopicsResult{
         topics: topics,
     }))
 }
 
 #[get("/api/topic/<topic>")]
-pub fn get_topic(topic: &str) -> Result<Json<GetTopicResult>, String> {
+pub fn get_topic(topic: &str) -> Result<Json<dto::GetTopicResult>, String> {
     let offsets = _get_offsets(topic)?;
     let groups = _get_topic_consumer_groups(topic, &offsets, false)?;
-    Ok(Json(GetTopicResult{
+    Ok(Json(dto::GetTopicResult{
         offsets: offsets,
         consumer_groups: groups,
     }))
 }
 
 #[get("/api/topic/<topic>/config")]
-pub async fn get_topic_configs(topic: &str) -> Result<Json<GetTopicConfigsResult>, String> {
+pub async fn get_topic_configs(topic: &str) -> Result<Json<dto::GetTopicConfigsResult>, String> {
     let client: AdminClient<DefaultClientContext> = map_error(ClientConfig::new()
         .set("bootstrap.servers", &*config::KAFKA_URLS).create())?;
 
@@ -274,11 +129,11 @@ pub async fn get_topic_configs(topic: &str) -> Result<Json<GetTopicConfigsResult
 
     let entries = _get_entries(configs)?;
 
-    Ok(Json(GetTopicConfigsResult{ entries: entries }))
+    Ok(Json(dto::GetTopicConfigsResult{ entries: entries }))
 }
 
 #[get("/api/broker/<broker>/config")]
-pub async fn get_broker_configs(broker: i32) -> Result<Json<GetBrokerConfigsResult>, String> {
+pub async fn get_broker_configs(broker: i32) -> Result<Json<dto::GetBrokerConfigsResult>, String> {
     let client: AdminClient<DefaultClientContext> = map_error(ClientConfig::new()
         .set("bootstrap.servers", &*config::KAFKA_URLS).create())?;
 
@@ -289,11 +144,11 @@ pub async fn get_broker_configs(broker: i32) -> Result<Json<GetBrokerConfigsResu
 
     let entries = _get_entries(configs)?;
 
-    Ok(Json(GetBrokerConfigsResult{ entries: entries }))
+    Ok(Json(dto::GetBrokerConfigsResult{ entries: entries }))
 }
 
 #[get("/api/cluster")]
-pub fn get_cluster() -> Result<Json<GetClusterResult>, String> {
+pub fn get_cluster() -> Result<Json<dto::GetClusterResult>, String> {
     let consumer: BaseConsumer = map_error(ClientConfig::new()
         .set("bootstrap.servers", &*config::KAFKA_URLS)
         .create())?;
@@ -304,18 +159,18 @@ pub fn get_cluster() -> Result<Json<GetClusterResult>, String> {
 
     let mut brokers = Vec::with_capacity(metadata.brokers().len());
     for broker in metadata.brokers() {
-        brokers.push(BrokerMetadata{
+        brokers.push(dto::BrokerMetadata{
             id: broker.id(),
             host: broker.host().to_owned(),
             port: broker.port(),
         })
     }
 
-    Ok(Json(GetClusterResult{ brokers: brokers }))
+    Ok(Json(dto::GetClusterResult{ brokers: brokers }))
 }
 
 #[get("/api/groups")]
-pub fn get_groups() -> Result<Json<GetGroupsResult>, String> {
+pub fn get_groups() -> Result<Json<dto::GetGroupsResult>, String> {
     let consumer: BaseConsumer = map_error(ClientConfig::new()
     .set("bootstrap.servers", &*config::KAFKA_URLS)
     .create())?;
@@ -329,7 +184,7 @@ pub fn get_groups() -> Result<Json<GetGroupsResult>, String> {
     for group in groups {
         let members = _get_members(&group);
         out.push(
-            GroupMetadata{
+            dto::GroupMetadata{
                 name: group.name().to_string(),
                 protocol: group.protocol().to_string(),
                 protocol_type: group.protocol_type().to_string(),
@@ -339,11 +194,11 @@ pub fn get_groups() -> Result<Json<GetGroupsResult>, String> {
         );
     }
 
-    Ok(Json(GetGroupsResult{groups: out}))
+    Ok(Json(dto::GetGroupsResult{groups: out}))
 }
 
 #[get("/api/members/<group>")]
-pub fn get_group_members(group: &str) -> Result<Json<GetGroupMembersResult>, String> {
+pub fn get_group_members(group: &str) -> Result<Json<dto::GetGroupMembersResult>, String> {
     let consumer: BaseConsumer = map_error(ClientConfig::new()
     .set("bootstrap.servers", &*config::KAFKA_URLS)
     .create())?;
@@ -362,26 +217,26 @@ pub fn get_group_members(group: &str) -> Result<Json<GetGroupMembersResult>, Str
     let group = &groups[0];
     let members = _get_members(&group);
 
-    Ok(Json(GetGroupMembersResult{members: members}))
+    Ok(Json(dto::GetGroupMembersResult{members: members}))
 }
 
 #[get("/api/topic/<topic>/consumer_groups")]
-pub fn get_topic_consumer_groups(topic: &str) -> Result<Json<GetTopicConsumerGroupsResult>, String> {
+pub fn get_topic_consumer_groups(topic: &str) -> Result<Json<dto::GetTopicConsumerGroupsResult>, String> {
     let offsets = _get_offsets(topic)?;
     let groups = _get_topic_consumer_groups(topic, &offsets, true)?;
-    Ok(Json(GetTopicConsumerGroupsResult{consumer_groups: groups}))
+    Ok(Json(dto::GetTopicConsumerGroupsResult{consumer_groups: groups}))
 }
 
 #[get("/api/topic/<topic>/offsets")]
-pub fn get_offsets(topic: &str) -> Result<Json<GetTopicOffsetsResult>, String> {
+pub fn get_offsets(topic: &str) -> Result<Json<dto::GetTopicOffsetsResult>, String> {
     let offsets = _get_offsets(topic)?;
-    Ok(Json(GetTopicOffsetsResult{
+    Ok(Json(dto::GetTopicOffsetsResult{
         offsets: offsets,
     }))
 }
 
 #[get("/api/offset/<topic>/<partition>/<timestamp>")]
-pub fn get_offset_for_timestamp(topic: &str, partition: i32, timestamp: i64) -> Result<Json<GetOffsetForTimestampResult>, String> {
+pub fn get_offset_for_timestamp(topic: &str, partition: i32, timestamp: i64) -> Result<Json<dto::GetOffsetForTimestampResult>, String> {
     let consumer: BaseConsumer = map_error(ClientConfig::new()
         .set("bootstrap.servers", &*config::KAFKA_URLS)
         .set("group.id", "krowser")
@@ -396,7 +251,7 @@ pub fn get_offset_for_timestamp(topic: &str, partition: i32, timestamp: i64) -> 
     let offsets = map_error(consumer.offsets_for_times(assignment, timeout))?;
     let partition_offsets = offsets.elements_for_topic(topic);
     if partition_offsets.len() == 0 {
-        return Ok(Json(GetOffsetForTimestampResult{
+        return Ok(Json(dto::GetOffsetForTimestampResult{
             offset: 0,
         }));
     }
@@ -405,13 +260,13 @@ pub fn get_offset_for_timestamp(topic: &str, partition: i32, timestamp: i64) -> 
     }
     let partition_offset = &partition_offsets[0];
     match partition_offset.offset() {
-        rdkafka::Offset::Offset(offset) => Ok(Json(GetOffsetForTimestampResult{
+        rdkafka::Offset::Offset(offset) => Ok(Json(dto::GetOffsetForTimestampResult{
             offset: offset,
         })),
         rdkafka::Offset::End => {
             let topic_offsets = _get_offsets(topic)?;
             if let Some(partition_offsets) = topic_offsets.iter().find(|v| v.partition == partition) {
-                return Ok(Json(GetOffsetForTimestampResult{
+                return Ok(Json(dto::GetOffsetForTimestampResult{
                     offset: partition_offsets.high,
                 }));
             }
@@ -421,7 +276,7 @@ pub fn get_offset_for_timestamp(topic: &str, partition: i32, timestamp: i64) -> 
     }
 }
 
-fn _get_members(group: &rdkafka::groups::GroupInfo) -> Vec<GroupMemberMetadata> {
+fn _get_members(group: &rdkafka::groups::GroupInfo) -> Vec<dto::GroupMemberMetadata> {
     let mut members = Vec::with_capacity(group.members().len());
     for member in group.members() {
         let assignment = match member.assignment() {
@@ -439,7 +294,7 @@ fn _get_members(group: &rdkafka::groups::GroupInfo) -> Vec<GroupMemberMetadata> 
             }
         };
         members.push(
-            GroupMemberMetadata{
+            dto::GroupMemberMetadata{
                 member_id: member.id().to_string(),
                 client_id: member.client_id().to_string(),
                 client_host: member.client_host().to_string(),
@@ -450,7 +305,7 @@ fn _get_members(group: &rdkafka::groups::GroupInfo) -> Vec<GroupMemberMetadata> 
     members
 }
 
-fn _get_entries(configs: Vec<ConfigResourceResult>) -> Result<Vec<ConfigEntry>, String> {
+fn _get_entries(configs: Vec<ConfigResourceResult>) -> Result<Vec<dto::ConfigEntry>, String> {
     if configs.len() == 0 {
         return Err("no configs found".to_string());
     }
@@ -461,7 +316,7 @@ fn _get_entries(configs: Vec<ConfigResourceResult>) -> Result<Vec<ConfigEntry>, 
 
     let mut entries = Vec::with_capacity(config.entries.len());
     for entry in &config.entries {
-        entries.push(ConfigEntry{
+        entries.push(dto::ConfigEntry{
             name: entry.name.to_string(),
             value: match &entry.value {
                 Some(val) => Some(val.to_string()),
@@ -477,7 +332,7 @@ fn _get_entries(configs: Vec<ConfigResourceResult>) -> Result<Vec<ConfigEntry>, 
     Ok(entries)
 }
 
-fn _get_offsets(topic: &str) -> Result<Vec<TopicOffsets>, String> {
+fn _get_offsets(topic: &str) -> Result<Vec<dto::TopicOffsets>, String> {
     println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
     let consumer: BaseConsumer = map_error(ClientConfig::new()
         .set("bootstrap.servers", &*config::KAFKA_URLS)
@@ -497,7 +352,7 @@ fn _get_offsets(topic: &str) -> Result<Vec<TopicOffsets>, String> {
     for partition in partitions {
         let watermarks = map_error(consumer
             .fetch_watermarks(topic, partition.id(), timeout))?;
-        offsets.push(TopicOffsets{
+        offsets.push(dto::TopicOffsets{
             partition: partition.id(),
             low: watermarks.0,
             high: watermarks.1,
@@ -506,7 +361,7 @@ fn _get_offsets(topic: &str) -> Result<Vec<TopicOffsets>, String> {
     Ok(offsets)
 }
 
-fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<TopicOffsets>, with_committed_offset: bool) -> Result<Vec<TopicConsumerGroup>, String> {
+fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<dto::TopicOffsets>, with_committed_offset: bool) -> Result<Vec<dto::TopicConsumerGroup>, String> {
     println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
     let consumer: BaseConsumer = map_error(ClientConfig::new()
         .set("bootstrap.servers", &*config::KAFKA_URLS)
@@ -549,7 +404,7 @@ fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<TopicOffsets>, with_com
                                     for elem in committed.elements() {
                                         if let rdkafka::Offset::Offset(offset) = elem.offset() {
                                             if let Some(partition_offsets) = offsets.iter().find(|v| v.partition == elem.partition()) {
-                                                let consumer_offsets = ConsumerGroupOffsets{
+                                                let consumer_offsets = dto::ConsumerGroupOffsets{
                                                     metadata: Some(elem.metadata().to_string()),
                                                     offset: offset,
                                                     partition_offsets: *partition_offsets,
@@ -563,7 +418,7 @@ fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<TopicOffsets>, with_com
                                         }
                                     }
                                 }
-                                let topic_group = TopicConsumerGroup{
+                                let topic_group = dto::TopicConsumerGroup{
                                     group_id: group.name().to_string(),
                                     offsets: consumer_group_offsets,
                                 };
@@ -587,18 +442,18 @@ pub async fn get_messages(
     limit: Option<i64>,
     offset: Option<i64>,
     search: Option<&str>,
-    search_style: Option<SearchStyle>,
+    search_style: Option<dto::SearchStyle>,
     timeout_millis: Option<u64>,
-    trace: bool) -> Result<Json<GetTopicMessagesResult>, String> {
+    trace: bool) -> Result<Json<dto::GetTopicMessagesResult>, String> {
 
     let limit = limit.unwrap_or(100);
     let offset = offset.unwrap_or(0);
     let timeout_millis = timeout_millis.unwrap_or(20000);
-    let search_style = search_style.unwrap_or(SearchStyle::None);
+    let search_style = search_style.unwrap_or(dto::SearchStyle::None);
     eprintln!("{:?} {:?} {}", search, search_style, timeout_millis);
     match timeout(Duration::from_millis(timeout_millis),
         _get_messages(topic, partition, limit, offset, search, search_style, trace)).await {
-            Err(_) => Ok(Json(GetTopicMessagesResult{has_timeout: true, messages: Vec::new()})),
+            Err(_) => Ok(Json(dto::GetTopicMessagesResult{has_timeout: true, messages: Vec::new()})),
             Ok(res) => res,
     }
 }
@@ -608,10 +463,10 @@ async fn _get_messages(topic: &str,
     mut limit: i64,
     offset: i64,
     search: Option<&str>,
-    search_style: SearchStyle,
-    trace: bool) -> Result<Json<GetTopicMessagesResult>, String> {
+    search_style: dto::SearchStyle,
+    trace: bool) -> Result<Json<dto::GetTopicMessagesResult>, String> {
     let regex: Option<Regex> = match search_style {
-        SearchStyle::Regex =>
+        dto::SearchStyle::Regex =>
             if let Some(pattern) = &search
                 { Some(map_error(Regex::new(pattern))?) } else
                 { None },
@@ -626,13 +481,13 @@ async fn _get_messages(topic: &str,
         found_partition = true;
         let max_offset =offsets.high;
         if max_offset == 0 || offset > max_offset {
-            return Ok(Json(GetTopicMessagesResult{messages: Vec::new(), has_timeout: false}))
+            return Ok(Json(dto::GetTopicMessagesResult{messages: Vec::new(), has_timeout: false}))
         }
         if offset + limit > max_offset {
             limit = max_offset - offset
         }
         if limit <= 0 {
-            return Ok(Json(GetTopicMessagesResult{messages: Vec::new(), has_timeout: false}))
+            return Ok(Json(dto::GetTopicMessagesResult{messages: Vec::new(), has_timeout: false}))
         }
         break;
     }
@@ -691,7 +546,7 @@ async fn _get_messages(topic: &str,
                     }
                 }
                 if !filtered_out {
-                    let msg = TopicMessage{
+                    let msg = dto::TopicMessage{
                         topic: topic.to_string(),
                         partition: partition,
                         key: key.to_owned(),
@@ -708,7 +563,7 @@ async fn _get_messages(topic: &str,
             break;
         }
     }
-    Ok(Json(GetTopicMessagesResult{
+    Ok(Json(dto::GetTopicMessagesResult{
         messages: messages,
         has_timeout: false,
     }))
@@ -787,10 +642,10 @@ fn decode_bytes(val: &mut Value) {
     }
 }
 
-fn includes(text: String, pattern: String, style: &SearchStyle, regex: &Option<Regex>) -> bool {
+fn includes(text: String, pattern: String, style: &dto::SearchStyle, regex: &Option<Regex>) -> bool {
     match style {
-        SearchStyle::None => text.to_ascii_lowercase().contains(&pattern.to_ascii_lowercase()),
-        SearchStyle::CaseSensitive => text.contains(&pattern),
-        SearchStyle::Regex => (*regex).as_ref().unwrap().is_match(&text),
+        dto::SearchStyle::None => text.to_ascii_lowercase().contains(&pattern.to_ascii_lowercase()),
+        dto::SearchStyle::CaseSensitive => text.contains(&pattern),
+        dto::SearchStyle::Regex => (*regex).as_ref().unwrap().is_match(&text),
     }
 }

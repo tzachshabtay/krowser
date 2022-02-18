@@ -5,7 +5,10 @@ use rocket::fs::{NamedFile, relative};
 use std::path::{Path, PathBuf};
 
 mod config;
-mod kafka;
+mod kafka {
+    pub mod api;
+    mod dto;
+}
 
 #[get("/<_file..>")]
 async fn index(_file: PathBuf) -> Option<NamedFile> {
@@ -33,16 +36,16 @@ fn rocket() -> _ {
     rocket::build().mount("/", routes![
         index,
         files,
-        kafka::get_topics,
-        kafka::get_offsets,
-        kafka::get_messages,
-        kafka::get_topic,
-        kafka::get_topic_consumer_groups,
-        kafka::get_topic_configs,
-        kafka::get_broker_configs,
-        kafka::get_cluster,
-        kafka::get_groups,
-        kafka::get_group_members,
-        kafka::get_offset_for_timestamp,
+        kafka::api::get_topics,
+        kafka::api::get_offsets,
+        kafka::api::get_messages,
+        kafka::api::get_topic,
+        kafka::api::get_topic_consumer_groups,
+        kafka::api::get_topic_configs,
+        kafka::api::get_broker_configs,
+        kafka::api::get_cluster,
+        kafka::api::get_groups,
+        kafka::api::get_group_members,
+        kafka::api::get_offset_for_timestamp,
     ])
 }
