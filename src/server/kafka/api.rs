@@ -26,6 +26,7 @@ use avro_rs::types::Value;
 use serde_json::Value as JsonValue;
 
 use std::time::Duration;
+use std::thread;
 
 use tokio::time::timeout;
 
@@ -70,15 +71,84 @@ fn map_error<T, E: std::fmt::Debug>(result: Result<T, E>) -> Result<T, String> {
     }
 }
 
+fn retry<T, E: std::fmt::Debug>(name: &str, action: &mut dyn std::ops::FnMut() -> std::result::Result<T, E>) -> Result<T, String> {
+    let mut retries = 5;
+    let mut wait = 500;
+    loop {
+        let res = action();
+        match res {
+            Ok(val) => { return Ok(val); },
+            Err(err) => {
+                if retries <= 0 {
+                    return Err(format!("{:?}", err));
+                }
+                eprintln!("Failed {}, retrying in {} milliseconds, retries left {}", name, wait, retries);
+                thread::sleep(Duration::from_millis(wait));
+                retries -= 1;
+                wait *= 2;
+            }
+        }
+    }
+}
+
+fn kafka_retry<C, T, E: std::fmt::Debug>(
+    name: &str,
+    consumer_creator: &mut dyn std::ops::FnMut() -> std::result::Result<C, E>,
+    action: &mut dyn std::ops::FnMut(C) -> std::result::Result<T, E>) -> Result<T, String> {
+    let mut retries = 5;
+    let mut wait = 500;
+    loop {
+        let consumer_res = consumer_creator();
+        match consumer_res {
+            Ok(consumer) => {
+                let res = action(consumer);
+                match res {
+                    Ok(val) => { return Ok(val); },
+                    Err(err) => {
+                        if retries <= 0 {
+                            return Err(format!("{:?}", err));
+                        }
+                        eprintln!("Failed connnecting to kafka for {}, retrying in {} milliseconds, retries left {}", name, wait, retries);
+                        thread::sleep(Duration::from_millis(wait));
+                        retries -= 1;
+                        wait *= 2;
+                    }
+                }
+            },
+            Err(err) => {
+                if retries <= 0 {
+                    return Err(format!("{:?}", err));
+                }
+                eprintln!("Failed {}, retrying in {} milliseconds, retries left {}", name, wait, retries);
+                thread::sleep(Duration::from_millis(wait));
+                retries -= 1;
+                wait *= 2;
+            }
+        }
+    }
+}
+
+fn base_consumer() -> KafkaResult<BaseConsumer> {
+    println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
+    ClientConfig::new()
+        .set("bootstrap.servers", &*config::KAFKA_URLS)
+        .create()
+}
+
+fn group_consumer(group: &str) -> KafkaResult<BaseConsumer> {
+    println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
+    ClientConfig::new()
+        .set("bootstrap.servers", &*config::KAFKA_URLS)
+        .set("group.id", group)
+        .set("enable.auto.commit", "false")
+        .create()
+
+}
+
 #[get("/api/topics")]
 pub fn get_topics() -> Result<Json<dto::GetTopicsResult>, String> {
-    println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
-    let consumer: BaseConsumer = map_error(ClientConfig::new()
-        .set("bootstrap.servers", &*config::KAFKA_URLS)
-        .create())?;
-
     let timeout = Duration::from_secs(10);
-    let metadata = map_error(consumer
+    let metadata = kafka_retry("fetching metadata", &mut base_consumer, &mut |consumer| consumer
         .fetch_metadata(None, timeout))?;
 
     let mut topics = Vec::with_capacity(metadata.topics().len());
@@ -149,12 +219,8 @@ pub async fn get_broker_configs(broker: i32) -> Result<Json<dto::GetBrokerConfig
 
 #[get("/api/cluster")]
 pub fn get_cluster() -> Result<Json<dto::GetClusterResult>, String> {
-    let consumer: BaseConsumer = map_error(ClientConfig::new()
-        .set("bootstrap.servers", &*config::KAFKA_URLS)
-        .create())?;
-
     let timeout = Duration::from_secs(10);
-    let metadata = map_error(consumer
+    let metadata = kafka_retry("fetching metadata", &mut base_consumer, &mut |consumer| consumer
         .fetch_metadata(None, timeout))?;
 
     let mut brokers = Vec::with_capacity(metadata.brokers().len());
@@ -171,12 +237,8 @@ pub fn get_cluster() -> Result<Json<dto::GetClusterResult>, String> {
 
 #[get("/api/groups")]
 pub fn get_groups() -> Result<Json<dto::GetGroupsResult>, String> {
-    let consumer: BaseConsumer = map_error(ClientConfig::new()
-    .set("bootstrap.servers", &*config::KAFKA_URLS)
-    .create())?;
-
     let timeout = Duration::from_secs(10);
-    let groups = map_error(consumer
+    let groups = kafka_retry("fetching groups", &mut base_consumer, &mut |consumer| consumer
         .fetch_group_list(None, timeout))?;
 
     let groups = groups.groups();
@@ -199,13 +261,10 @@ pub fn get_groups() -> Result<Json<dto::GetGroupsResult>, String> {
 
 #[get("/api/members/<group>")]
 pub fn get_group_members(group: &str) -> Result<Json<dto::GetGroupMembersResult>, String> {
-    let consumer: BaseConsumer = map_error(ClientConfig::new()
-    .set("bootstrap.servers", &*config::KAFKA_URLS)
-    .create())?;
-
     let timeout = Duration::from_secs(10);
-    let groups = map_error(consumer
+    let groups = kafka_retry("fetching groups", &mut base_consumer, &mut |consumer| consumer
         .fetch_group_list(Some(group), timeout))?;
+
     let groups = groups.groups();
 
     if groups.len() == 0 {
@@ -237,18 +296,14 @@ pub fn get_offsets(topic: &str) -> Result<Json<dto::GetTopicOffsetsResult>, Stri
 
 #[get("/api/offset/<topic>/<partition>/<timestamp>")]
 pub fn get_offset_for_timestamp(topic: &str, partition: i32, timestamp: i64) -> Result<Json<dto::GetOffsetForTimestampResult>, String> {
-    let consumer: BaseConsumer = map_error(ClientConfig::new()
-        .set("bootstrap.servers", &*config::KAFKA_URLS)
-        .set("group.id", "krowser")
-        .set("enable.auto.commit", "false")
-        .create())?;
-
     let timeout = Duration::from_secs(10);
 
-    let mut assignment = TopicPartitionList::new();
-    map_error(assignment.add_partition_offset(topic, partition, rdkafka::Offset::Offset(timestamp)))?; // that's not a mistake, the librdkafka api actually takes a timestamp for the offset.
+    let offsets = kafka_retry("fetching offsets for times", &mut || group_consumer("krowser"), &mut |consumer| {
+        let mut assignment = TopicPartitionList::new();
+        assignment.add_partition_offset(topic, partition, rdkafka::Offset::Offset(timestamp))?; // that's not a mistake, the librdkafka api actually takes a timestamp for the offset.
+        return consumer.offsets_for_times(assignment, timeout);
+    })?;
 
-    let offsets = map_error(consumer.offsets_for_times(assignment, timeout))?;
     let partition_offsets = offsets.elements_for_topic(topic);
     if partition_offsets.len() == 0 {
         return Ok(Json(dto::GetOffsetForTimestampResult{
@@ -333,14 +388,12 @@ fn _get_entries(configs: Vec<ConfigResourceResult>) -> Result<Vec<dto::ConfigEnt
 }
 
 fn _get_offsets(topic: &str) -> Result<Vec<dto::TopicOffsets>, String> {
-    println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
-    let consumer: BaseConsumer = map_error(ClientConfig::new()
-        .set("bootstrap.servers", &*config::KAFKA_URLS)
-        .create())?;
+    let consumer: BaseConsumer = retry("connecting consumer", &mut || base_consumer())?;
 
     let timeout = Duration::from_secs(10);
-    let metadata = map_error(consumer
+    let metadata = retry("fetching metadata", &mut || consumer
         .fetch_metadata(Some(topic), timeout))?;
+
     if metadata.topics().len() == 0 {
         return Err("topic not found".to_string())
     }
@@ -350,7 +403,7 @@ fn _get_offsets(topic: &str) -> Result<Vec<dto::TopicOffsets>, String> {
     let partitions = metadata.topics()[0].partitions();
     let mut offsets = Vec::with_capacity(partitions.len());
     for partition in partitions {
-        let watermarks = map_error(consumer
+        let watermarks = retry("fetching watermarks", &mut || consumer
             .fetch_watermarks(topic, partition.id(), timeout))?;
         offsets.push(dto::TopicOffsets{
             partition: partition.id(),
@@ -362,14 +415,9 @@ fn _get_offsets(topic: &str) -> Result<Vec<dto::TopicOffsets>, String> {
 }
 
 fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<dto::TopicOffsets>, with_committed_offset: bool) -> Result<Vec<dto::TopicConsumerGroup>, String> {
-    println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
-    let consumer: BaseConsumer = map_error(ClientConfig::new()
-        .set("bootstrap.servers", &*config::KAFKA_URLS)
-        .create())?;
-
     //todo: we're fetching all groups each time we fetch for a specific topic, we can use a very short-lived cache instead as we query for all topics from the topics page
     let timeout = Duration::from_secs(10);
-    let groups = map_error(consumer
+    let groups = kafka_retry("fetching groups", &mut base_consumer, &mut |consumer| consumer
         .fetch_group_list(None, timeout))?;
 
     let groups = groups.groups();
@@ -390,17 +438,14 @@ fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<dto::TopicOffsets>, wit
                             if v.contains(&pattern) {
                                 let mut consumer_group_offsets = Vec::with_capacity(group.members().len());
                                 if with_committed_offset {
-                                    let group_consumer: BaseConsumer = map_error(ClientConfig::new()
-                                        .set("bootstrap.servers", &*config::KAFKA_URLS)
-                                        .set("group.id", group.name())
-                                        .set("enable.auto.commit", "false")
-                                        .create())?;
+                                    let committed: TopicPartitionList = kafka_retry("fetching offsets for times", &mut || group_consumer(group.name()), &mut |consumer| {
                                         let mut assignment = TopicPartitionList::new();
                                         for offset in offsets {
-                                            map_error(assignment.add_partition_offset(topic, offset.partition, rdkafka::Offset::Offset(0)))?;
+                                            assignment.add_partition_offset(topic, offset.partition, rdkafka::Offset::Offset(0))?;
                                         }
-                                        map_error(group_consumer.assign(&assignment))?;
-                                    let committed: TopicPartitionList = map_error(group_consumer.committed(timeout))?;
+                                        consumer.assign(&assignment)?;
+                                        consumer.committed(timeout)
+                                    })?;
                                     for elem in committed.elements() {
                                         if let rdkafka::Offset::Offset(offset) = elem.offset() {
                                             if let Some(partition_offsets) = offsets.iter().find(|v| v.partition == elem.partition()) {
@@ -495,18 +540,16 @@ async fn _get_messages(topic: &str,
         return Err(format!("partition {} not found for topic {}", partition, topic))
     }
 
-    let context = CustomContext;
-
     println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
-    let consumer: LoggingConsumer = map_error(ClientConfig::new()
+    let consumer: LoggingConsumer = retry("connecting consumer", &mut || ClientConfig::new()
         .set("bootstrap.servers", &*config::KAFKA_URLS)
         .set("group.id", "krowser")
         .set("enable.auto.commit", "false")
-        .create_with_context(context))?;
+        .create_with_context(CustomContext))?;
 
     let mut assignment = TopicPartitionList::new();
     map_error(assignment.add_partition_offset(topic, partition, rdkafka::Offset::Offset(offset)))?;
-    map_error(consumer.assign(&assignment))?;
+    retry("assigning consumer", &mut || consumer.assign(&assignment))?;
 
     let srs = SrSettings::new((&*config::SCHEMA_REGISTRY_URL).to_string());
     let mut avro_decoder = AvroDecoder::new(srs);
