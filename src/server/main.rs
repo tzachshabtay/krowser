@@ -9,6 +9,13 @@ mod kafka {
     pub mod api;
     mod dto;
 }
+mod kafka_connect {
+    pub mod api;
+    mod dto;
+}
+mod common {
+    pub mod errors;
+}
 
 #[get("/<_file..>")]
 async fn index(_file: PathBuf) -> Option<NamedFile> {
@@ -47,5 +54,10 @@ fn rocket() -> _ {
         kafka::api::get_groups,
         kafka::api::get_group_members,
         kafka::api::get_offset_for_timestamp,
+        kafka_connect::api::get_connectors,
+        kafka_connect::api::get_connector_status,
+        kafka_connect::api::get_connector_config,
+        kafka_connect::api::get_connector_tasks,
+        kafka_connect::api::get_connector_task_status,
     ])
 }

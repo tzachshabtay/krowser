@@ -1,4 +1,3 @@
-import { SeekEntry } from "kafkajs";
 import { Schema } from "avsc";
 
 export type MaybeError = { error?: string }
@@ -34,8 +33,9 @@ export type GetSchemaResult = MaybeError & { schema: Schema, id: number }
 
 export type ConnectorState = `RUNNING` | `FAILED` | `PAUSED`
 export type ConnectorConfig = { [key: string]: string }
-export type GetConnectorsResult = MaybeError & string[]
-export type GetConnectorStatusResult = MaybeError & { name: string, connector: { state: ConnectorState, worker_id: string }, tasks: { state: ConnectorState, id: number, worker_id: string}[], type: string }
-export type GetConnectorConfigResult = MaybeError & ConnectorConfig
-export type GetConnectorTasksResult = MaybeError & { id: {connector: string, task: number}, config: {[key: string]: string} }[]
-export type GetConnectorTaskStatusResult = MaybeError & { state: ConnectorState, id: number, worker_id: string }
+export type ConnectorTask = { state: ConnectorState, id: number, worker_id: string }
+export type GetConnectorsResult = MaybeError & { connectors: string[] }
+export type GetConnectorStatusResult = MaybeError & { name: string, connector: {state: ConnectorState, worker_id: string}, tasks: ConnectorTask[], type: string }
+export type GetConnectorConfigResult = MaybeError & { config: ConnectorConfig }
+export type GetConnectorTasksResult = MaybeError & { id: {connector: string, task: number}, config: ConnectorConfig }[]
+export type GetConnectorTaskStatusResult = MaybeError & { task: ConnectorTask }
