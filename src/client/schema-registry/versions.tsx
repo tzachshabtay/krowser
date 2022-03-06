@@ -10,7 +10,6 @@ import { GetSchemaResult, GetSubjectVersionsResult } from "../../shared/api";
 import { Schema } from "avsc";
 import { CancelToken, Loader } from "../common/loader";
 
-
 type State = {
     loading: boolean;
     rows: any[];
@@ -84,7 +83,7 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
             this.setState({loading: false, error: data.error, errorPrefix: "Failed to fetch versions. Error: "})
             return
         }
-        const results = data.map(r => (
+        const results = data.versions.map(r => (
             { version: r }))
         this.setState({ loading: false, rows: results })
         const customCols = {cols: {}}
@@ -102,9 +101,10 @@ export class Versions extends React.Component<RouteComponentProps<{ subject: str
             this.setState({loading: false, error: data.error, errorPrefix: `Failed to fetch schema for version ${version.version}. Error: `})
             return
         }
-        version.schema = data.schema
+        let record: RecordType = JSON.parse(data.schema)
+        version.schema = record
         version.schemaID = data.id
-        this.addToRow(version, data.schema as RecordType, customCols, "")
+        this.addToRow(version, record, customCols, "")
         if (this.gridApi) {
             this.gridApi.refreshCells()
         }

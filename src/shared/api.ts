@@ -27,9 +27,9 @@ export type GetTopicMessagesResult = MaybeError & TopicMessages
 export type GetGroupsResult = MaybeError & { groups: GroupMetadata[] }
 export type GetGroupMembersResult = MaybeError & { members: GroupMemberMetadata[] }
 
-export type GetSubjectsResult = MaybeError & string[]
-export type GetSubjectVersionsResult = MaybeError & number[]
-export type GetSchemaResult = MaybeError & { schema: Schema, id: number }
+export type GetSubjectsResult = MaybeError & { subjects: string[] }
+export type GetSubjectVersionsResult = MaybeError & { versions: number[] }
+export type GetSchemaResult = MaybeError & { subject: string, id: number, schema: string, version: number }
 
 export type ConnectorState = `RUNNING` | `FAILED` | `PAUSED`
 export type ConnectorConfig = { [key: string]: string }

@@ -26,7 +26,7 @@ class ViewVersionsButton extends React.Component<CellProps, {}> {
 
 type Subject = {
     subject: string,
-    versions?: GetSubjectVersionsResult,
+    versions?: number[],
     num_versions?: number,
     history: History<unknown>,
 }
@@ -63,7 +63,7 @@ export class Subjects extends React.Component<RouteComponentProps, State> {
             this.setState({ loading: false, error: data.error, errorPrefix: "Failed to fetch subjects. Error: "})
             return
         }
-        const results = data.map(r => (
+        const results = data.subjects.map(r => (
             { subject: r, history: this.props.history }))
         this.setState({ loading: false, rows: results })
         for (const subject of results) {
@@ -79,8 +79,8 @@ export class Subjects extends React.Component<RouteComponentProps, State> {
             this.setState({ loading: false, error: data.error, errorPrefix: `Failed to fetch subject ${subject.subject}. Error: `})
             return
         }
-        subject.num_versions = data.length
-        subject.versions = data
+        subject.num_versions = data.versions.length
+        subject.versions = data.versions
         if (this.gridApi) {
             this.gridApi.refreshCells()
         }

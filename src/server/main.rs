@@ -13,6 +13,10 @@ mod kafka_connect {
     pub mod api;
     mod dto;
 }
+mod schema_registry {
+    pub mod api;
+    mod dto;
+}
 mod common {
     pub mod errors;
 }
@@ -59,5 +63,8 @@ fn rocket() -> _ {
         kafka_connect::api::get_connector_config,
         kafka_connect::api::get_connector_tasks,
         kafka_connect::api::get_connector_task_status,
+        schema_registry::api::get_subjects,
+        schema_registry::api::get_subject_versions,
+        schema_registry::api::get_schema,
     ])
 }
