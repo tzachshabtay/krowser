@@ -413,12 +413,11 @@ fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<dto::TopicOffsets>, wit
                                 let mut consumer_group_offsets = Vec::with_capacity(group.members().len());
                                 if with_committed_offset {
                                     let committed: TopicPartitionList = kafka_retry("fetching offsets for times", &mut || group_consumer(group.name()), &mut |consumer| {
-                                        let mut assignment = TopicPartitionList::new();
+                                        let mut tpl = TopicPartitionList::new();
                                         for offset in offsets {
-                                            assignment.add_partition_offset(topic, offset.partition, rdkafka::Offset::Offset(0))?;
+                                            tpl.add_partition_offset(topic, offset.partition, rdkafka::Offset::Offset(0))?;
                                         }
-                                        consumer.assign(&assignment)?;
-                                        consumer.committed(timeout)
+                                        consumer.committed_offsets(tpl, timeout)
                                     })?;
                                     for elem in committed.elements() {
                                         if let rdkafka::Offset::Offset(offset) = elem.offset() {
