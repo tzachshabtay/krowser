@@ -44,7 +44,10 @@ fn assets() -> &'static str {
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![
+    let figment = rocket::Config::figment()
+        .merge(("port", *config::SERVER_PORT));
+
+    rocket::custom(figment).mount("/", routes![
         index,
         files,
         kafka::api::get_topics,
