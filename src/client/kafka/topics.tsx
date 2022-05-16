@@ -7,8 +7,7 @@ import { CellProps, CellButton } from '../common/cell_button';
 import { GridApi, ColumnApi, GridReadyEvent } from 'ag-grid-community';
 import { ErrorMsg} from '../common/error_msg';
 import { Url } from "../common/url";
-import { GetTopicResult, GetTopicsResult, TopicConsumerGroups, TopicOffsets, TopicsOffsets } from "../../shared/api";
-import { DescribeConfigResponse, ITopicMetadata } from "kafkajs";
+import { GetTopicResult, GetTopicsResult, TopicsOffsets, TopicMetadata } from "../../shared/api";
 import { History } from 'history';
 import { CancelToken, Loader } from "../common/loader";
 
@@ -33,7 +32,7 @@ class ViewConsumerGroupsButton extends React.Component<CellProps, {}> {
 
 class ViewConfigsButton extends React.Component<CellProps, {}> {
     render() {
-        return <CellButton getUrl={() => `/topic/configs/${this.props.data.topic}`} {...this.props} />
+        return <CellButton getUrl={() => `/topic/configs/${this.props.data.topic}`} {...this.props} value="Show" />
     }
 }
 
@@ -46,14 +45,12 @@ class ViewMessagesButton extends React.Component<CellProps, {}> {
 type Topic = {
     topic: string,
     num_partitions: number,
-    raw: ITopicMetadata,
+    raw: TopicMetadata,
     history: History<unknown>,
     offsets?: TopicsOffsets,
-    config?: DescribeConfigResponse,
-    groups?: TopicConsumerGroups,
+    groups?: string[],
     num_messages?: number,
     num_groups?: number | `Unknown`,
-    num_configs?: number | `Unknown`,
 }
 
 export class Topics extends React.Component<RouteComponentProps, State> {
@@ -88,7 +85,7 @@ export class Topics extends React.Component<RouteComponentProps, State> {
             this.setState({loading: false, error: data.error, errorPrefix: "Failed to fetch topics. Error: "})
             return
         }
-        const results: Topic[] = data.topics.map((r: ITopicMetadata) => (
+        const results: Topic[] = data.topics.map((r: TopicMetadata) => (
             { topic: r.name, num_partitions: r.partitions.length, raw: r, history: this.props.history }))
         this.setState({ loading: false, rows: results })
         for (const topic of results) {
@@ -106,22 +103,16 @@ export class Topics extends React.Component<RouteComponentProps, State> {
         }
         let sum = 0
         for (const partition of data.offsets) {
-            const high = parseInt(partition.high)
-            sum += high
+            const messages_in_partition = partition.high - partition.low
+            sum += messages_in_partition
         }
         topic.offsets = data.offsets
-        topic.config = data.config
-        topic.groups = data.groups
+        topic.groups = data.consumer_groups?.map(p => p.group_id)
         topic.num_messages = sum
-        if (data.groups) {
-            topic.num_groups = data.groups.length
+        if (data.consumer_groups) {
+            topic.num_groups = data.consumer_groups.length
         } else {
             topic.num_groups = `Unknown`
-        }
-        if (data.config) {
-            topic.num_configs = data.config.resources[0].configEntries.length
-        } else {
-            topic.num_configs = `Unknown`
         }
         if (this.gridApi) {
             this.gridApi.refreshCells()
@@ -135,7 +126,7 @@ export class Topics extends React.Component<RouteComponentProps, State> {
             { headerName: "#Partitions", field: "num_partitions", filter: "agNumberColumnFilter", cellRendererFramework: ViewPartitionsButton },
             { headerName: "#Messages", field: "num_messages", filter: "agNumberColumnFilter", cellRendererFramework: ViewMessagesButton },
             { headerName: "#Consumer Groups", field: "num_groups", filter: "agNumberColumnFilter", cellRendererFramework: ViewConsumerGroupsButton },
-            { headerName: "#Configs", field: "num_configs", filter: "agNumberColumnFilter", cellRendererFramework: ViewConfigsButton },
+            { headerName: "Configs", field: "num_configs", filter: "agNumberColumnFilter", cellRendererFramework: ViewConfigsButton },
         ]
     }
 
@@ -152,7 +143,7 @@ export class Topics extends React.Component<RouteComponentProps, State> {
                 {!this.state.loading && <DataView
                     search={(r: Topic) => r.topic}
                     rows={this.state.rows}
-                    raw={this.state.rows.map(r => ({...r.raw, num_messages: r.num_messages, offsets: r.offsets, config: r.config, groups: r.groups }))}
+                    raw={this.state.rows.map(r => ({...r.raw, num_messages: r.num_messages, offsets: r.offsets, groups: r.groups }))}
                     url={this.url}
                     columnDefs={this.getColumnDefs()}
                     onGridReady={this.onGridReady}

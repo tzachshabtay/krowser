@@ -49,7 +49,7 @@ type Group = {
 }
 
 export class TopicGroups extends React.Component<RouteComponentProps<{ topic: string }>, State> {
-    state: State = { loading: true, rows: [], data: [], error: "" }
+    state: State = { loading: true, rows: [], data: { consumer_groups: []}, error: "" }
     url: Url;
     loader: Loader = new Loader()
 
@@ -74,20 +74,20 @@ export class TopicGroups extends React.Component<RouteComponentProps<{ topic: st
             return
         }
         const results: Group[] = []
-        for (const group of data) {
+        for (const group of data.consumer_groups) {
             for (const partition of group.offsets) {
-                const high = parseInt(partition.partitionOffsets?.high ?? "-1")
-                const offset = parseInt(partition.offset)
+                const high = partition.partition_offsets?.high ?? -1
+                const offset = partition.offset
                 let lag = high - offset
                 if (offset === -1) {
                     lag -= 1
                 }
                 results.push({
-                    name: group.groupId,
-                    partition: partition.partition,
+                    name: group.group_id,
+                    partition: partition.partition_offsets?.partition ?? -1,
                     offset,
                     high,
-                    low: parseInt(partition.partitionOffsets?.low ?? "-1"),
+                    low: partition.partition_offsets?.low ?? -1,
                     lag,
                 })
             }
@@ -120,7 +120,7 @@ export class TopicGroups extends React.Component<RouteComponentProps<{ topic: st
                 {!this.state.loading && <DataView
                     search={(r: Group) => r.name}
                     rows={this.state.rows}
-                    raw={this.state.data}
+                    raw={this.state.data.consumer_groups}
                     url={this.url}
                     columnDefs={this.getColumnDefs()}>
                 </DataView>}

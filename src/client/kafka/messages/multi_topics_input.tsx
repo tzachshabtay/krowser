@@ -8,8 +8,7 @@ import MenuItem from '@material-ui/core/MenuItem';
 import ListItemText from '@material-ui/core/ListItemText';
 import { Fetcher, SearchBy, AllPartitions, FetchData } from './fetcher';
 import { Url } from '../../common/url';
-import { GetTopicsResult } from "../../../shared/api";
-import { ITopicMetadata } from "kafkajs";
+import { GetTopicsResult, TopicMetadata } from "../../../shared/api";
 
 interface Props {
     selectedTopics?: string;
@@ -50,7 +49,7 @@ export class MultiTopicsInput extends React.Component<Props, State> {
             this.setState({loadingTopics: false, error: data.error })
             return
         }
-        const topics = data.topics.map((r: ITopicMetadata) => r.name)
+        const topics = data.topics.map((r: TopicMetadata) => r.name)
         this.setState({topics, loadingTopics: false})
     }
 

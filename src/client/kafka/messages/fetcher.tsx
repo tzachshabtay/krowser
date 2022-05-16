@@ -13,7 +13,7 @@ import { Url } from '../../common/url';
 import { SearchStyle } from '../../../shared/search';
 import Box from '@material-ui/core/Box';
 import Typography from '@material-ui/core/Typography';
-import { GetTopicMessagesResult, GetTopicOffsetsByTimestapResult, GetTopicOffsetsResult, TopicOffsets } from "../../../shared/api";
+import { GetTopicMessagesResult, GetTopicOffsetByTimestampResult, GetTopicOffsetsResult, TopicOffsets } from "../../../shared/api";
 import { CancelToken, Loader } from "../../common/loader";
 
 export type SearchBy = "offset" | "time" | "newest" | "oldest";
@@ -184,7 +184,7 @@ export class Fetcher extends React.Component<Props, State> {
 
     getOffsetForTime = async (topic: string, partition: number, time: string, cancelToken: CancelToken): Promise<number | undefined> => {
         const millis = new Date(time).getTime();
-        const data: GetTopicOffsetsByTimestapResult = await cancelToken.Fetch(`/api/offsets/${topic}/${millis}`)
+        const data: GetTopicOffsetByTimestampResult = await cancelToken.Fetch(`/api/offset/${topic}/${partition}/${millis}`)
         if (cancelToken.Aborted) {
             return undefined
         }
@@ -192,8 +192,7 @@ export class Fetcher extends React.Component<Props, State> {
             this.props.onError(data.error)
             return undefined
         }
-        const result = parseInt(data.find((item: { partition: number; }) => item.partition === partition)?.offset ?? "0")
-        return result
+        return data.offset;
     }
 
     getSelectedPartitions = async(topic: string, cancelToken: CancelToken): Promise<number[]> => {
@@ -224,7 +223,7 @@ export class Fetcher extends React.Component<Props, State> {
                 if (offsets === undefined) {
                     return
                 }
-                await this.setStateAsync({offset: parseInt(offsets.low)})
+                await this.setStateAsync({offset: offsets.low})
                 out = await this.fetchMessagesForPartition(topic, timeout, partition, out, cancelToken)
             }
         }
@@ -242,9 +241,9 @@ export class Fetcher extends React.Component<Props, State> {
                 if (offsets === undefined) {
                     return
                 }
-                let offset = parseInt(offsets.high) - this.state.limit
-                if (offset < parseInt(offsets.low)) {
-                    offset = parseInt(offsets.low)
+                let offset = offsets.high - this.state.limit
+                if (offset < offsets.low) {
+                    offset = offsets.low
                 }
                 await this.setStateAsync({offset})
                 out = await this.fetchMessagesForPartition(topic, timeout, partition, out, cancelToken)
@@ -350,7 +349,7 @@ export class Fetcher extends React.Component<Props, State> {
                 topic: this.props.topics.length > 1 ? `Topic ${topic}, ` : "",
             }})
             const data: GetTopicMessagesResult = await cancelToken.Fetch(
-                `/api/messages/${topic}/${partition}?limit=${limit}&offset=${cursor}&search=${encodeURIComponent(this.state.search)}&search_style=${this.state.searchStyle}&timeout=${timeout}`,
+                `/api/messages/${topic}/${partition}?limit=${limit}&offset=${cursor}&search=${encodeURIComponent(this.state.search)}&search_style=${this.state.searchStyle}&timeout_millis=${timeout}`,
             )
             if (cancelToken.Aborted) {
                 break

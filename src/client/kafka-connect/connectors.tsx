@@ -73,7 +73,7 @@ export class Connectors extends React.Component<RouteComponentProps, State> {
             this.setState({loading: false, error: data.error})
             return
         }
-        const rows: Connector[] = data.map(c => ({name: c, state: "Loading", workerId: "Loading", type: "Loading", history: this.props.history}))
+        const rows: Connector[] = data.connectors.map(c => ({name: c, state: "Loading", workerId: "Loading", type: "Loading", history: this.props.history}))
         this.setState({ loading: false, rows })
         for (const connector of rows) {
             await this.fetchConnector(connector, cancelToken)
@@ -111,9 +111,9 @@ export class Connectors extends React.Component<RouteComponentProps, State> {
             this.setState({loading: false, error: data.error})
             return
         }
-        data = ReplaceDots(data)
-        connector.config = data
-        this.state.customCols.cols = {...this.state.customCols.cols, ...data}
+        let config = ReplaceDots(data.config)
+        connector.config = config
+        this.state.customCols.cols = {...this.state.customCols.cols, ...config}
         this.refreshGrid()
     }
 

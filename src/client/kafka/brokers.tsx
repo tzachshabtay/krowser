@@ -20,7 +20,7 @@ type BrokerRow = { history: History<unknown> } & Broker
 
 class ViewConfigsButton extends React.Component<CellProps, {}> {
     render() {
-        return <CellButton getUrl={() => `/broker/configs/${this.props.data.nodeId}`} data={this.props.data} value="View"/>
+        return <CellButton getUrl={() => `/broker/configs/${this.props.data.id}`} data={this.props.data} value="View"/>
     }
 }
 
@@ -55,7 +55,7 @@ export class Brokers extends React.Component<RouteComponentProps, State> {
 
     getColumnDefs() {
         return [
-            { headerName: "Node ID", field: "nodeId", filter: "agNumberColumnFilter" },
+            { headerName: "Node ID", field: "id", filter: "agNumberColumnFilter" },
             { headerName: "Host", field: "host" },
             { headerName: "Port", field: "port", filter: "agNumberColumnFilter" },
             { headerName: "Configs", field: "view_configs", cellRendererFramework: ViewConfigsButton },

@@ -74,8 +74,8 @@ export class Tasks extends React.Component<RouteComponentProps<{ connector: stri
             this.setState({loading: false, error: data.error})
             return
         }
-        task.state = data.state
-        task.workerId = data.worker_id
+        task.state = data.task.state
+        task.workerId = data.task.worker_id
         this.refreshGrid()
     }
 

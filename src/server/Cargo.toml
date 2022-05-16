@@ -1,0 +1,27 @@
+[package]
+name = "krowser"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rocket = { version = "0.5.0-rc.1", features = ["json"] }
+rdkafka = { version = "0.28", features = ["cmake-build"] }
+tokio = { version = "1.0", features = ["full"] }
+futures = "0.3"
+avro-rs = "0.13"
+serde = { version = "1", features = ["derive"] }
+anyhow = "1"
+structopt = "*"
+schema_registry_converter = { version = "2.1.0", features = ["avro"] }
+serde_json = "1.0"
+once_cell = "1.9.0"
+regex = "1.5.4"
+reqwest = { version = "0.11.9", features = ["json"] }
+async-std = "1.10.0"
+
+
+[[bin]]
+name = "krowser"
+path = "main.rs"

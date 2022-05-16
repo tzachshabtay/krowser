@@ -38,13 +38,14 @@ Run it via: `docker run -it -p 9999:9999 tzachs/krowser`
 If you need to configure URLs (of kafka, schema registry), you can run, for example (if you need to run against local kafka and schema-registry):
 `docker run -it -p 9999:9999 --env KAFKA_URL=host.docker.internal:9092 --env SCHEMA_REGISTRY_URL=host.docker.internal:8081 tzachs/krowser`
 
-All available environment variable configurations can be seen in [the config file](./src/server/config.ts).
+All available environment variable configurations can be seen in [the config file](./src/server/config.rs).
 
 A [docker-compose example](./docs/examples/docker-compose.yml) is also available.
 
 ## Local Development
 
-- To install dependencies (`nodejs` v12 needs to be installed first), run: `npm i`
+- Node.js v12 and Rust 2021 edition need to be installed first
+- To install dependencies for the frontend, run: `npm i`
 - To build backend, run: `npm run build:backend`
 - To build frontend, run: `npm run build:frontend`
 - To start the server, run: `npm start`

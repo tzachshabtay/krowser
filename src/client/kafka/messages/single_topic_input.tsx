@@ -61,7 +61,7 @@ export class SingleTopicInput extends React.Component<Props, State> {
             const isEmpty = r.high.toString() === "0"
             const label = isEmpty ?
                 `Partition: ${r.partition} (Empty)` :
-                `Partition: ${r.partition} (Low- ${r.low}, High- ${r.high}, Current- ${r.offset})`;
+                `Partition: ${r.partition} (Low- ${r.low}, High- ${r.high})`;
             return { label: label, value: r.partition.toString(), isEmpty }
         })
         const newState: Pick<State, keyof State> = { loadingPartitions: false, partitions: [{label: `All Partitions`, value: AllPartitions, isEmpty: true}, ...results], offset: this.state.offset, partition: this.state.partition, loadingMessages: this.state.loadingMessages }
@@ -87,8 +87,8 @@ export class SingleTopicInput extends React.Component<Props, State> {
             return undefined
         }
         const partition = data.offsets[parseInt(partitionIndex)]
-        const high = parseInt(partition.high)
-        const low = parseInt(partition.low)
+        const high = partition.high
+        const low = partition.low
         let offset = high - (this.props.limit ?? 5)
         if (offset < low) {
             offset = low
