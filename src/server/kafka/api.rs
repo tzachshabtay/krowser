@@ -536,28 +536,23 @@ async fn _get_messages(topic: &str,
         match message {
             Err(e) => eprintln!("Kafka error: {}", e),
             Ok(m) => {
-                let key = match m.key() {
-                    Some(k) => match std::str::from_utf8(k) {
-                        Ok(v) => v,
-                        Err(_) => "Non-Utf8",
-                    },
-                    None => "",
-                };
                 let timestamp = match m.timestamp() {
                     Timestamp::NotAvailable => 0,
                     Timestamp::CreateTime(v) => v,
                     Timestamp::LogAppendTime(v) => v,
                 };
-                let decoded = decode(&m, DecodingAttribute::Value, &decoders).await?;
-                let json = &decoded.json.unwrap();
+                let decoded_value = decode(&m, DecodingAttribute::Value, &decoders).await?;
+                let json_value = &decoded_value.json.unwrap();
+                let decoded_key = decode(&m, DecodingAttribute::Key, &decoders).await?;
+                let json_key = &decoded_key.json.unwrap();
                 if trace {
                     eprintln!("key: '{:?}', value: {:?}, topic: {}, offset: {}, timestamp: {:?}",
-                        key, json, m.topic(), m.offset(), timestamp);
+                        json_key, json_value, m.topic(), m.offset(), timestamp);
                 }
                 let mut filtered_out = false;
                 if let Some(pattern) = search {
-                    let schema = *&decoded.schema.as_ref();
-                    let text = format!("{},{},{}", key.to_string(), json, schema.unwrap_or(&"".to_string()));
+                    let schema = *&decoded_value.schema.as_ref();
+                    let text = format!("{},{},{}", json_key, json_value, schema.unwrap_or(&"".to_string()));
                     if !includes(text, pattern.to_string(), &search_style, &regex) {
                         filtered_out = true;
                     }
@@ -566,11 +561,11 @@ async fn _get_messages(topic: &str,
                     let msg = dto::TopicMessage{
                         topic: topic.to_string(),
                         partition: partition,
-                        key: key.to_owned(),
+                        key: json_key.to_string(),
                         timestamp: timestamp,
                         offset: m.offset(),
-                        value: json.to_string(),
-                        schema_type: decoded.schema,
+                        value: json_value.to_string(),
+                        schema_type: decoded_value.schema,
                     };
                     messages.push(msg);
                 }
