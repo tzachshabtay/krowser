@@ -8,6 +8,10 @@ mod config;
 mod kafka {
     pub mod api;
     mod dto;
+    mod decoders {
+        pub mod api;
+        pub mod avro;
+    }
 }
 mod kafka_connect {
     pub mod api;

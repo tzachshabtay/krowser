@@ -16,14 +16,9 @@ use rdkafka::consumer::Rebalance;
 use rdkafka::consumer::ConsumerContext;
 use rdkafka::consumer::StreamConsumer;
 use rdkafka::error::{KafkaResult};
+use rdkafka::message::BorrowedMessage;
 
 use futures::StreamExt;
-
-use schema_registry_converter::async_impl::schema_registry::SrSettings;
-use schema_registry_converter::async_impl::avro::AvroDecoder;
-
-use avro_rs::types::Value;
-use serde_json::Value as JsonValue;
 
 use std::time::Duration;
 use std::thread;
@@ -35,6 +30,8 @@ use regex::Regex;
 use crate::config;
 use crate::kafka::dto;
 use crate::common::errors::{map_error, retry};
+use crate::kafka::decoders::avro::AvroCustomDecoder;
+use crate::kafka::decoders::api::{Decoder, DecodingAttribute, DecodedContents};
 
 struct CustomContext;
 
@@ -524,8 +521,11 @@ async fn _get_messages(topic: &str,
     map_error(assignment.add_partition_offset(topic, partition, rdkafka::Offset::Offset(offset)))?;
     retry("assigning consumer", &mut || consumer.assign(&assignment))?;
 
-    let srs = SrSettings::new((&*config::SCHEMA_REGISTRY_URL).to_string());
-    let mut avro_decoder = AvroDecoder::new(srs);
+    let mut avro_decoder: AvroCustomDecoder = Default::default();
+    let mut decoders: Vec<&mut dyn Decoder> = vec![&mut avro_decoder];
+    for decoder in decoders.iter_mut() {
+        decoder.on_init().await;
+    }
 
     let mut num_consumed = 0;
     let mut messages = Vec::with_capacity(limit.try_into().unwrap());
@@ -536,27 +536,23 @@ async fn _get_messages(topic: &str,
         match message {
             Err(e) => eprintln!("Kafka error: {}", e),
             Ok(m) => {
-                let key = match m.key() {
-                    Some(k) => match std::str::from_utf8(k) {
-                        Ok(v) => v,
-                        Err(_) => "Non-Utf8",
-                    },
-                    None => "",
-                };
                 let timestamp = match m.timestamp() {
                     Timestamp::NotAvailable => 0,
                     Timestamp::CreateTime(v) => v,
                     Timestamp::LogAppendTime(v) => v,
                 };
-                let decoded = decode(m.payload(), &mut avro_decoder).await?;
+                let decoded_value = decode(&m, DecodingAttribute::Value, &decoders).await?;
+                let json_value = &decoded_value.json.unwrap();
+                let decoded_key = decode(&m, DecodingAttribute::Key, &decoders).await?;
+                let json_key = &decoded_key.json.unwrap();
                 if trace {
                     eprintln!("key: '{:?}', value: {:?}, topic: {}, offset: {}, timestamp: {:?}",
-                        key, decoded.value, m.topic(), m.offset(), timestamp);
+                        json_key, json_value, m.topic(), m.offset(), timestamp);
                 }
                 let mut filtered_out = false;
                 if let Some(pattern) = search {
-                    let schema = *&decoded.schema.as_ref();
-                    let text = format!("{},{},{}", key.to_string(), decoded.value, schema.unwrap_or(&"".to_string()));
+                    let schema = *&decoded_value.schema.as_ref();
+                    let text = format!("{},{},{}", json_key, json_value, schema.unwrap_or(&"".to_string()));
                     if !includes(text, pattern.to_string(), &search_style, &regex) {
                         filtered_out = true;
                     }
@@ -565,11 +561,11 @@ async fn _get_messages(topic: &str,
                     let msg = dto::TopicMessage{
                         topic: topic.to_string(),
                         partition: partition,
-                        key: key.to_owned(),
+                        key: json_key.to_string(),
                         timestamp: timestamp,
                         offset: m.offset(),
-                        value: decoded.value,
-                        schema_type: decoded.schema,
+                        value: json_value.to_string(),
+                        schema_type: decoded_value.schema,
                     };
                     messages.push(msg);
                 }
@@ -585,76 +581,21 @@ async fn _get_messages(topic: &str,
     }))
 }
 
-struct DecodedValue {
-    value: String,
-    schema: Option<String>,
-}
-
-async fn decode(payload: Option<&[u8]>, avro_decoder: &mut AvroDecoder<'_>) -> Result<DecodedValue, String> {
-    match payload {
-        None => Ok(DecodedValue{value: "".to_string(), schema: None}),
-        Some(buffer) => {
-            match avro_decoder.decode(payload).await {
-                Err(err) => {
-                    eprintln!("error decoding avro: {}", err);
-                },
-                Ok(val) => {
-                    let mut decoded_val = val.value;
-                    decode_bytes(&mut decoded_val);
-                    let schema = match val.name {
-                        None => None,
-                        Some(v) => Some(format!("{}.{}", v.namespace.unwrap_or("".to_string()), v.name)),
-                    };
-                    let json;
-                    match JsonValue::try_from(decoded_val) {
-                        Err(err) => {
-                            eprintln!("error parsing json: {}", err);
-                            json = format!("error parsing json: {}", err);
-                        },
-                        Ok(json_val) => json = match serde_json::to_string(&json_val) {
-                            Ok(v) => v,
-                            Err(e) => e.to_string(),
-                        },
-                    }
-                    return Ok(DecodedValue{value: json, schema: schema});
-                }
-            };
-            match std::str::from_utf8(buffer) {
-                Ok(v) => Ok(DecodedValue{value: v.to_string(), schema: None}),
-                Err(_) => Ok(DecodedValue{value: "Non-Utf8".to_string(), schema: None}),
-            }
-        },
-    }
-}
-
-// decode_bytes recursively goes over an avro value and changes bytes to its utf-8 sting representation (if can be decoded by utf-8)
-fn decode_bytes(val: &mut Value) {
-    match val {
-        Value::Bytes(bytes) => {
-            match std::str::from_utf8(&bytes) {
-                Ok(v) => *val = Value::String(v.to_string()),
-                Err(_) => {},
-            }
-        },
-        Value::Array(vals) => {
-            for item in vals.iter_mut() {
-                decode_bytes(item);
-            }
-        },
-        Value::Map(map) => {
-            for (_k, v) in map.iter_mut() {
-                decode_bytes(v);
-            }
-        },
-        Value::Record(record) => {
-            for (_k, v) in record.iter_mut() {
-                decode_bytes(v);
-            }
-        },
-        Value::Union(uni) => {
-            decode_bytes(uni);
+async fn decode(message: &BorrowedMessage<'_>, attr: DecodingAttribute, decoders: &Vec<&mut dyn Decoder>) -> Result<DecodedContents, String>{
+    for decoder in decoders {
+        let result = decoder.decode(message, &attr).await?;
+        if let Some(_) = result.json {
+            return Ok(result);
         }
-        _ => {},
+    }
+    let payload = message.payload();
+    match payload {
+        None => Ok(DecodedContents{json: Some("".to_string()), schema: None}),
+        Some(buffer) =>
+            match std::str::from_utf8(buffer) {
+                Ok(v) => Ok(DecodedContents{json: Some(v.to_string()), schema: None}),
+                Err(_) => Ok(DecodedContents{json: Some("Non-Utf8".to_string()), schema: None}),
+            }
     }
 }
 
