@@ -5,13 +5,14 @@ use avro_rs::types::Value;
 use rdkafka::message::BorrowedMessage;
 use rdkafka::message::Message;
 use serde_json::Value as JsonValue;
+use std::sync::RwLock;
 
 use crate::config;
 use crate::kafka::decoders::api;
 
 #[derive(Debug, Default)]
 pub struct AvroCustomDecoder {
-    settings: Option<SrSettings>,
+    settings: RwLock<Option<SrSettings>>,
 }
 
 #[async_trait]
@@ -20,8 +21,9 @@ impl api::Decoder for AvroCustomDecoder {
         "Avro (Confluent Schema Registry)"
     }
 
-    async fn on_init(&mut self) {
-        self.settings = Some(SrSettings::new((&*config::SCHEMA_REGISTRY_URL).to_string()));
+    async fn on_init(&self) {
+        let mut settings = self.settings.write().unwrap();
+        *settings = Some(SrSettings::new((&*config::SCHEMA_REGISTRY_URL).to_string()));
     }
 
     async fn decode(&self, message: &BorrowedMessage, attribute: &api::DecodingAttribute) -> Result<api::DecodedContents, String> {
@@ -37,7 +39,7 @@ impl AvroCustomDecoder {
         match payload {
             None => Ok(api::DecodedContents{json: None, schema: None}),
             Some(_) => {
-                let mut decoder = AvroDecoder::new(self.settings.as_ref().unwrap().clone());
+                let mut decoder = AvroDecoder::new(self.settings.read().unwrap().as_ref().unwrap().clone());
                 let task = decoder.decode(payload);
                 match task.await {
                     Err(err) => {

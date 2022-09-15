@@ -18,7 +18,7 @@ pub trait Decoder: Any + Send + Sync {
     fn name(&self) -> &'static str;
 
     /// This is called on startup to enable initializiing resources.
-    async fn on_init(&mut self);
+    async fn on_init(&self);
 
     /// Should attempt to decode a kafka message's key/value into json (the attribute instructs whether to decode the key or the value).
     /// If the key/value is not encoded in a protocol the decoder understands,
