@@ -31,7 +31,8 @@ use crate::config;
 use crate::kafka::dto;
 use crate::common::errors::{map_error, retry};
 use crate::kafka::decoders::avro::AvroCustomDecoder;
-use crate::kafka::decoders::api::{Decoder, DecodingAttribute, DecodedContents};
+use crate::kafka::decoders::decoders::Decoders;
+use serverapi::{Decoder, DecodingAttribute, DecodedContents};
 
 struct CustomContext;
 
@@ -521,8 +522,15 @@ async fn _get_messages(topic: &str,
     map_error(assignment.add_partition_offset(topic, partition, rdkafka::Offset::Offset(offset)))?;
     retry("assigning consumer", &mut || consumer.assign(&assignment))?;
 
-    let mut avro_decoder: AvroCustomDecoder = Default::default();
-    let mut decoders: Vec<&mut dyn Decoder> = vec![&mut avro_decoder];
+    //let mut avro_decoder: AvroCustomDecoder = Default::default();
+    let mut decoders: Vec<&mut dyn Decoder> = vec![/*&mut avro_decoder*/];
+
+    let mut loader = Decoders::new();
+    unsafe {
+        loader.load_plugin("../../docs/examples/plugins/helloworld/target/debug/libhelloworld.dylib").await.unwrap();
+
+        decoders.push(&mut *(loader.decoders[0]));
+    }
     for decoder in decoders.iter_mut() {
         decoder.on_init().await;
     }

@@ -933,6 +933,7 @@ dependencies = [
  "async-trait",
  "avro-rs",
  "futures",
+ "libloading",
  "once_cell",
  "rdkafka",
  "regex",
@@ -941,6 +942,7 @@ dependencies = [
  "schema_registry_converter",
  "serde",
  "serde_json",
+ "serverapi",
  "structopt",
  "tokio",
 ]
@@ -984,6 +986,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39a734c0493409afcd49deee13c006a04e3586b9761a03543c6272c9c51f2f5a"
 dependencies = [
  "rle-decode-fast",
+]
+
+[[package]]
+name = "libloading"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efbc0f03f9a775e9f6aed295c6a1ba2253c5757a9e03d55c6caa46a681abcddd"
+dependencies = [
+ "cfg-if",
+ "winapi",
 ]
 
 [[package]]
@@ -1858,6 +1870,16 @@ dependencies = [
  "itoa 0.4.8",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "serverapi"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "async-trait",
+ "libloading",
+ "rdkafka",
 ]
 
 [[package]]

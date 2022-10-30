@@ -11,6 +11,7 @@ mod kafka {
     mod decoders {
         pub mod api;
         pub mod avro;
+        pub mod decoders;
     }
 }
 mod kafka_connect {

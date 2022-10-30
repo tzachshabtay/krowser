@@ -6,9 +6,10 @@ use rdkafka::message::BorrowedMessage;
 use rdkafka::message::Message;
 use serde_json::Value as JsonValue;
 use std::sync::RwLock;
+use serverapi::{Decoder, DecodingAttribute, DecodedContents};
+
 
 use crate::config;
-use crate::kafka::decoders::api;
 
 #[derive(Debug, Default)]
 pub struct AvroCustomDecoder {
@@ -16,7 +17,7 @@ pub struct AvroCustomDecoder {
 }
 
 #[async_trait]
-impl api::Decoder for AvroCustomDecoder {
+impl Decoder for AvroCustomDecoder {
     fn name(&self) -> &'static str  {
         "Avro (Confluent Schema Registry)"
     }
@@ -26,25 +27,25 @@ impl api::Decoder for AvroCustomDecoder {
         *settings = Some(SrSettings::new((&*config::SCHEMA_REGISTRY_URL).to_string()));
     }
 
-    async fn decode(&self, message: &BorrowedMessage, attribute: &api::DecodingAttribute) -> Result<api::DecodedContents, String> {
+    async fn decode(&self, message: &BorrowedMessage, attribute: &DecodingAttribute) -> Result<DecodedContents, String> {
         match attribute {
-            api::DecodingAttribute::Key => self.decode_payload(message.key()).await,
-            api::DecodingAttribute::Value => self.decode_payload(message.payload()).await,
+            DecodingAttribute::Key => self.decode_payload(message.key()).await,
+            DecodingAttribute::Value => self.decode_payload(message.payload()).await,
         }
     }
 }
 
 impl AvroCustomDecoder {
-    async fn decode_payload(&self, payload: Option<&[u8]>) -> Result<api::DecodedContents, String> {
+    async fn decode_payload(&self, payload: Option<&[u8]>) -> Result<DecodedContents, String> {
         match payload {
-            None => Ok(api::DecodedContents{json: None, schema: None}),
+            None => Ok(DecodedContents{json: None, schema: None}),
             Some(_) => {
                 let mut decoder = AvroDecoder::new(self.settings.read().unwrap().as_ref().unwrap().clone());
                 let task = decoder.decode(payload);
                 match task.await {
                     Err(err) => {
                         eprintln!("error decoding avro: {}", err);
-                        return Ok(api::DecodedContents{json: None, schema: None});
+                        return Ok(DecodedContents{json: None, schema: None});
                     },
                     Ok(val) => {
                         let mut decoded_val = val.value;
@@ -64,7 +65,7 @@ impl AvroCustomDecoder {
                                 Err(e) => e.to_string(),
                             },
                         }
-                        return Ok(api::DecodedContents{json: Some(json), schema: schema});
+                        return Ok(DecodedContents{json: Some(json), schema: schema});
                     }
                 };
             },
