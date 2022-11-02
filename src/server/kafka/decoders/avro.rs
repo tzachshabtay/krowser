@@ -24,7 +24,7 @@ impl Decoder for AvroCustomDecoder {
 
     async fn on_init(&self) {
         let mut settings = self.settings.write().unwrap();
-        *settings = Some(SrSettings::new((&*config::SCHEMA_REGISTRY_URL).to_string()));
+        *settings = Some(SrSettings::new((&(*config::SETTINGS).confluent_schema_registry.url).to_string()));
     }
 
     async fn decode(&self, message: &BorrowedMessage, attribute: &DecodingAttribute) -> Result<DecodedContents, String> {

@@ -1,0 +1,12 @@
+[kafka]
+urls = "localhost:9092"
+decoders = "avro"
+
+[confluent_schema_registry]
+url = "http://localhost:8081"
+
+[kafka_connect]
+url = "http://localhost:8083"
+
+[server]
+port = 9999

@@ -1,19 +1,53 @@
-use std::env;
+use config::{Config, ConfigError, Environment, File};
+use serde_derive::Deserialize;
 use once_cell::sync::Lazy;
 
-pub static KAFKA_URLS: Lazy<String> = Lazy::new(||get_string("KAFKA_URLS", "localhost:9092"));
-
-pub static SCHEMA_REGISTRY_URL: Lazy<String> = Lazy::new(||get_string("SCHEMA_REGISTRY_URL", "http://localhost:8081"));
-
-pub static KAFKA_CONNECT_URL: Lazy<String> = Lazy::new(||get_string("KAFKA_CONNECT_URL", "http://localhost:8083"));
-
-pub static SERVER_PORT: Lazy<i32> = Lazy::new(||get_int("SERVER_PORT", "9999"));
-
-fn get_string(name: &str, default: &str) -> String {
-    env::var(name).unwrap_or(default.to_string())
+#[derive(Debug, Deserialize)]
+pub struct KafkaTopic {
+    pub name: String,
+    pub decoders: String,
 }
 
-fn get_int(name: &str, default: &str) -> i32 {
-    let envstr = env::var(name).unwrap_or(default.to_string());
-    envstr.parse::<i32>().unwrap()
+#[derive(Debug, Deserialize)]
+pub struct Kafka {
+    pub urls: String,
+    pub decoders: String,
+    pub kafka_topics: Option<Vec<KafkaTopic>>,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct ConfluentSchemaRegistry {
+    pub url: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct KafkaConnect {
+    pub url: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Server {
+    pub port: i32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Settings  {
+    pub kafka: Kafka,
+    pub confluent_schema_registry: ConfluentSchemaRegistry,
+    pub kafka_connect: KafkaConnect,
+    pub server: Server,
+}
+
+impl Settings {
+    pub fn new() -> Result<Self, ConfigError> {
+        let s = Config::builder()
+            .add_source(File::with_name("default"))
+            .add_source(File::with_name("config").required(false))
+            .add_source(Environment::default().separator("_"))
+            .build()?;
+
+        s.try_deserialize()
+    }
+}
+
+pub static SETTINGS: Lazy<Settings> = Lazy::new(||Settings::new().unwrap());

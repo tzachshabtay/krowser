@@ -101,16 +101,16 @@ fn kafka_retry<C, T, E: std::fmt::Debug>(
 }
 
 fn base_consumer() -> KafkaResult<BaseConsumer> {
-    println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
+    println!("Connecting to kafka at: {}", (*config::SETTINGS).kafka.urls);
     ClientConfig::new()
-        .set("bootstrap.servers", &*config::KAFKA_URLS)
+        .set("bootstrap.servers", &(*config::SETTINGS).kafka.urls)
         .create()
 }
 
 fn group_consumer(group: &str) -> KafkaResult<BaseConsumer> {
-    println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
+    println!("Connecting to kafka at: {}", (*config::SETTINGS).kafka.urls);
     ClientConfig::new()
-        .set("bootstrap.servers", &*config::KAFKA_URLS)
+        .set("bootstrap.servers", &(*config::SETTINGS).kafka.urls)
         .set("group.id", group)
         .set("enable.auto.commit", "false")
         .create()
@@ -162,7 +162,7 @@ pub fn get_topic(topic: &str) -> Result<Json<dto::GetTopicResult>, String> {
 #[get("/api/topic/<topic>/config")]
 pub async fn get_topic_configs(topic: &str) -> Result<Json<dto::GetTopicConfigsResult>, String> {
     let client: AdminClient<DefaultClientContext> = map_error(ClientConfig::new()
-        .set("bootstrap.servers", &*config::KAFKA_URLS).create())?;
+        .set("bootstrap.servers", &(*config::SETTINGS).kafka.urls).create())?;
 
     let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(5)));
     let configs: Vec<ConfigResourceResult> = map_error(client.describe_configs(&[
@@ -177,7 +177,7 @@ pub async fn get_topic_configs(topic: &str) -> Result<Json<dto::GetTopicConfigsR
 #[get("/api/broker/<broker>/config")]
 pub async fn get_broker_configs(broker: i32) -> Result<Json<dto::GetBrokerConfigsResult>, String> {
     let client: AdminClient<DefaultClientContext> = map_error(ClientConfig::new()
-        .set("bootstrap.servers", &*config::KAFKA_URLS).create())?;
+        .set("bootstrap.servers", &(*config::SETTINGS).kafka.urls).create())?;
 
     let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(5)));
     let configs: Vec<ConfigResourceResult> = map_error(client.describe_configs(&[
@@ -511,9 +511,9 @@ async fn _get_messages(topic: &str,
         return Err(format!("partition {} not found for topic {}", partition, topic))
     }
 
-    println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
+    println!("Connecting to kafka at: {}", (*config::SETTINGS).kafka.urls);
     let consumer: LoggingConsumer = retry("connecting consumer", &mut || ClientConfig::new()
-        .set("bootstrap.servers", &*config::KAFKA_URLS)
+        .set("bootstrap.servers", &(*config::SETTINGS).kafka.urls)
         .set("group.id", "krowser")
         .set("enable.auto.commit", "false")
         .create_with_context(CustomContext))?;

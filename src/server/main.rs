@@ -9,7 +9,6 @@ mod kafka {
     pub mod api;
     mod dto;
     mod decoders {
-        pub mod api;
         pub mod avro;
         pub mod decoders;
     }
@@ -50,7 +49,7 @@ fn assets() -> &'static str {
 #[launch]
 fn rocket() -> _ {
     let figment = rocket::Config::figment()
-        .merge(("port", *config::SERVER_PORT));
+        .merge(("port", (*config::SETTINGS).server.port));
 
     rocket::custom(figment).mount("/", routes![
         index,
