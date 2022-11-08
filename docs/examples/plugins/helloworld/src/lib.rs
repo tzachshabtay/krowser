@@ -10,7 +10,11 @@ pub struct HelloWorld;
 
 #[async_trait]
 impl Decoder for HelloWorld {
-    fn name(&self) -> &'static str  {
+    fn id(&self) -> &'static str  {
+        "hello_world"
+    }
+
+    fn display_name(&self) -> &'static str  {
         "Hello World"
     }
 

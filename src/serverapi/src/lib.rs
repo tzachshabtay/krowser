@@ -14,8 +14,11 @@ pub enum DecodingAttribute {
 
 #[async_trait]
 pub trait Decoder: Any + Send + Sync {
-    /// A name for the decoder (will appear in a protocol column and in logs).
-    fn name(&self) -> &'static str;
+    /// An id for the decoder (will appear in the configuration file for selecting decoders per topic).
+    fn id(&self) -> &'static str;
+
+    /// A name for the decoder (will appear in an encoding column).
+    fn display_name(&self) -> &'static str;
 
     /// This is called on startup to enable initializiing resources.
     async fn on_init(&self);

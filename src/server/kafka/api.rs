@@ -30,8 +30,7 @@ use regex::Regex;
 use crate::config;
 use crate::kafka::dto;
 use crate::common::errors::{map_error, retry};
-use crate::kafka::decoders::avro::AvroCustomDecoder;
-use crate::kafka::decoders::decoders::Decoders;
+use crate::kafka::decoders::decoders::DECODERS;
 use serverapi::{Decoder, DecodingAttribute, DecodedContents};
 
 struct CustomContext;
@@ -522,17 +521,9 @@ async fn _get_messages(topic: &str,
     map_error(assignment.add_partition_offset(topic, partition, rdkafka::Offset::Offset(offset)))?;
     retry("assigning consumer", &mut || consumer.assign(&assignment))?;
 
-    //let mut avro_decoder: AvroCustomDecoder = Default::default();
-    let mut decoders: Vec<&mut dyn Decoder> = vec![/*&mut avro_decoder*/];
-
-    let mut loader = Decoders::new();
+    let decoders: Vec<&Box<dyn Decoder>>;
     unsafe {
-        loader.load_plugin("../../docs/examples/plugins/helloworld/target/debug/libhelloworld.dylib").await.unwrap();
-
-        decoders.push(&mut *(loader.decoders[0]));
-    }
-    for decoder in decoders.iter_mut() {
-        decoder.on_init().await;
+        decoders = DECODERS.get_decoders(topic.to_string());
     }
 
     let mut num_consumed = 0;
@@ -589,7 +580,7 @@ async fn _get_messages(topic: &str,
     }))
 }
 
-async fn decode(message: &BorrowedMessage<'_>, attr: DecodingAttribute, decoders: &Vec<&mut dyn Decoder>) -> Result<DecodedContents, String>{
+async fn decode(message: &BorrowedMessage<'_>, attr: DecodingAttribute, decoders: &Vec<&Box<dyn Decoder>>) -> Result<DecodedContents, String>{
     for decoder in decoders {
         let result = decoder.decode(message, &attr).await?;
         if let Some(_) = result.json {

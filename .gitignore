@@ -6,3 +6,5 @@ full-stack
 .history
 .DS_Store
 .python-version
+*.dylib
+src/server/config.toml

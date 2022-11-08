@@ -18,7 +18,11 @@ pub struct AvroCustomDecoder {
 
 #[async_trait]
 impl Decoder for AvroCustomDecoder {
-    fn name(&self) -> &'static str  {
+    fn id(&self) -> &'static str  {
+        "avro_confluent_schema_registry"
+    }
+
+    fn display_name(&self) -> &'static str  {
         "Avro (Confluent Schema Registry)"
     }
 
