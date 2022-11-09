@@ -125,6 +125,8 @@ pub struct TopicMessage {
     pub schema_type: Option<String>,
     pub timestamp: i64,
     pub offset: i64,
+    pub key_decoding: String,
+    pub value_decoding: String,
 }
 
 #[derive(Serialize)]

@@ -541,16 +541,16 @@ async fn _get_messages(topic: &str,
                     Timestamp::LogAppendTime(v) => v,
                 };
                 let decoded_value = decode(&m, DecodingAttribute::Value, &decoders).await?;
-                let json_value = &decoded_value.json.unwrap();
+                let json_value = &decoded_value.contents.json.unwrap();
                 let decoded_key = decode(&m, DecodingAttribute::Key, &decoders).await?;
-                let json_key = &decoded_key.json.unwrap();
+                let json_key = &decoded_key.contents.json.unwrap();
                 if trace {
                     eprintln!("key: '{:?}', value: {:?}, topic: {}, offset: {}, timestamp: {:?}",
                         json_key, json_value, m.topic(), m.offset(), timestamp);
                 }
                 let mut filtered_out = false;
                 if let Some(pattern) = search {
-                    let schema = *&decoded_value.schema.as_ref();
+                    let schema = *&decoded_value.contents.schema.as_ref();
                     let text = format!("{},{},{}", json_key, json_value, schema.unwrap_or(&"".to_string()));
                     if !includes(text, pattern.to_string(), &search_style, &regex) {
                         filtered_out = true;
@@ -564,7 +564,9 @@ async fn _get_messages(topic: &str,
                         timestamp: timestamp,
                         offset: m.offset(),
                         value: json_value.to_string(),
-                        schema_type: decoded_value.schema,
+                        schema_type: decoded_value.contents.schema,
+                        key_decoding: decoded_key.decoding,
+                        value_decoding: decoded_value.decoding,
                     };
                     messages.push(msg);
                 }
@@ -580,20 +582,25 @@ async fn _get_messages(topic: &str,
     }))
 }
 
-async fn decode(message: &BorrowedMessage<'_>, attr: DecodingAttribute, decoders: &Vec<&Box<dyn Decoder>>) -> Result<DecodedContents, String>{
+pub struct DecodedMessage {
+    pub contents: DecodedContents,
+    pub decoding: String,
+}
+
+async fn decode(message: &BorrowedMessage<'_>, attr: DecodingAttribute, decoders: &Vec<&Box<dyn Decoder>>) -> Result<DecodedMessage, String>{
     for decoder in decoders {
         let result = decoder.decode(message, &attr).await?;
         if let Some(_) = result.json {
-            return Ok(result);
+            return Ok(DecodedMessage{contents: result, decoding: decoder.display_name().to_string()});
         }
     }
     let payload = message.payload();
     match payload {
-        None => Ok(DecodedContents{json: Some("".to_string()), schema: None}),
+        None => Ok(DecodedMessage{contents: DecodedContents{json: Some("".to_string()), schema: None}, decoding: "Empty".to_string()}),
         Some(buffer) =>
             match std::str::from_utf8(buffer) {
-                Ok(v) => Ok(DecodedContents{json: Some(v.to_string()), schema: None}),
-                Err(_) => Ok(DecodedContents{json: Some("Non-Utf8".to_string()), schema: None}),
+                Ok(v) => Ok(DecodedMessage{contents: DecodedContents{json: Some(v.to_string()), schema: None}, decoding: "UTF-8".to_string()}),
+                Err(_) => Ok(DecodedMessage{contents: DecodedContents{json: Some(format!("Unknown message of size {}", buffer.len())), schema: None}, decoding: "Unknown".to_string()}),
             }
     }
 }

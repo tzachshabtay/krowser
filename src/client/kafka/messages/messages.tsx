@@ -48,6 +48,8 @@ export class Messages extends React.Component<Props, State> {
             rowKey: data.key,
             rowTopic: data.topic,
             rowPartition: data.partition,
+            rowKeyDecoding: data.key_decoding,
+            rowValueDecoding: data.value_decoding,
         }
         let cols = {}
         let rowValue: any = data.value
@@ -116,6 +118,8 @@ export class Messages extends React.Component<Props, State> {
         this.addCustomColumns(cols, this.state.customCols.cols, ``)
         cols.push({headerName: "Key", field: "rowKey"})
         cols.push({headerName: "Value", field: "rowValue"})
+        cols.push({headerName: "Key Decoding", field: "rowKeyDecoding"})
+        cols.push({headerName: "Value Decoding", field: "rowValueDecoding"})
         return cols
     }
 
