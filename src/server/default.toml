@@ -1,6 +1,7 @@
 [kafka]
 urls = "localhost:9092"
-decoders = "avro_confluent_schema_registry"
+key-decoders = "avro_confluent_schema_registry"
+value-decoders = "avro_confluent_schema_registry"
 
 [confluent-schema-registry]
 url = "http://localhost:8081"

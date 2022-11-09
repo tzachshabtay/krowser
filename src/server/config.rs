@@ -6,14 +6,18 @@ use once_cell::sync::Lazy;
 #[serde(rename_all = "kebab-case")]
 pub struct KafkaTopic {
     pub name: String,
-    pub decoders: String,
+    #[serde(default)]
+    pub key_decoders: String,
+    #[serde(default)]
+    pub value_decoders: String,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Kafka {
     pub urls: String,
-    pub decoders: String,
+    pub key_decoders: String,
+    pub value_decoders: String,
     pub kafka_topics: Option<Vec<KafkaTopic>>, //todo: support reading this from environment variables, see: https://github.com/mehcode/config-rs/blob/master/src/env.rs#L45 and for the individual kafka topic object: https://serde.rs/string-or-struct.html
 }
 

@@ -78,14 +78,27 @@ impl Decoders {
         Ok(())
     }
 
-    pub fn get_decoders(&mut self, topic: String) -> Vec<&Box<dyn Decoder>> {
+    pub fn get_decoders(&mut self, topic: String, key: bool) -> Vec<&Box<dyn Decoder>> {
         let mut decoders: Vec<&Box<dyn Decoder>> = vec![];
-        let mut decoders_str = (&(*config::SETTINGS).kafka.decoders).to_string();
+        let mut decoders_str = (&(*config::SETTINGS).kafka.value_decoders).to_string();
+        if key {
+            decoders_str = (&(*config::SETTINGS).kafka.key_decoders).to_string();
+        }
         if let Some(topics) = &(*config::SETTINGS).kafka.kafka_topics {
             for topic_group in topics {
+                if key && topic_group.key_decoders.is_empty() {
+                    continue;
+                }
+                if !key && topic_group.value_decoders.is_empty() {
+                    continue;
+                }
                 let regex = Regex::new(&topic_group.name).unwrap(); // todo: we could cache the regex-es at startup to increase performance
                 if regex.is_match(&topic) {
-                    decoders_str = topic_group.decoders.to_string();
+                    if key {
+                        decoders_str = topic_group.key_decoders.to_string();
+                    } else {
+                        decoders_str = topic_group.value_decoders.to_string();
+                    }
                     break;
                 }
             }

@@ -521,9 +521,11 @@ async fn _get_messages(topic: &str,
     map_error(assignment.add_partition_offset(topic, partition, rdkafka::Offset::Offset(offset)))?;
     retry("assigning consumer", &mut || consumer.assign(&assignment))?;
 
-    let decoders: Vec<&Box<dyn Decoder>>;
+    let key_decoders: Vec<&Box<dyn Decoder>>;
+    let value_decoders: Vec<&Box<dyn Decoder>>;
     unsafe {
-        decoders = DECODERS.get_decoders(topic.to_string());
+        key_decoders = DECODERS.get_decoders(topic.to_string(), true);
+        value_decoders = DECODERS.get_decoders(topic.to_string(), false);
     }
 
     let mut num_consumed = 0;
@@ -540,9 +542,9 @@ async fn _get_messages(topic: &str,
                     Timestamp::CreateTime(v) => v,
                     Timestamp::LogAppendTime(v) => v,
                 };
-                let decoded_value = decode(&m, DecodingAttribute::Value, &decoders).await?;
+                let decoded_value = decode(&m, DecodingAttribute::Value, &value_decoders).await?;
                 let json_value = &decoded_value.contents.json.unwrap();
-                let decoded_key = decode(&m, DecodingAttribute::Key, &decoders).await?;
+                let decoded_key = decode(&m, DecodingAttribute::Key, &key_decoders).await?;
                 let json_key = &decoded_key.contents.json.unwrap();
                 if trace {
                     eprintln!("key: '{:?}', value: {:?}, topic: {}, offset: {}, timestamp: {:?}",
