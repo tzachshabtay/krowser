@@ -1,3 +1,4 @@
+use crate::kafka::dto::DecoderMetadata;
 use crate::common::errors::map_error;
 use crate::kafka::decoders::avro::AvroCustomDecoder;
 use crate::config;
@@ -107,6 +108,21 @@ impl Decoders {
         for token in tokens {
             let decoder = self.decoders.get(token).unwrap();
             decoders.push(decoder);
+        }
+        decoders
+    }
+
+    pub fn get_decoder(&mut self, id: &str) -> Result<&Box<dyn Decoder>, String> {
+        match self.decoders.get(id) {
+            Some(decoder) => Ok(decoder),
+            None => Err(format!("no decoder with id {}", id))
+        }
+    }
+
+    pub fn get_decoders_metadata(&mut self) -> Vec<DecoderMetadata> {
+        let mut decoders: Vec<DecoderMetadata> = vec![];
+        for (_, value) in &self.decoders {
+            decoders.push(DecoderMetadata{id: value.id().to_string(), display_name: value.display_name().to_string()});
         }
         decoders
     }

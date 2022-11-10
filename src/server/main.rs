@@ -65,6 +65,7 @@ fn rocket() -> _ {
         kafka::api::get_groups,
         kafka::api::get_group_members,
         kafka::api::get_offset_for_timestamp,
+        kafka::api::get_decoders,
         kafka_connect::api::get_connectors,
         kafka_connect::api::get_connector_status,
         kafka_connect::api::get_connector_config,

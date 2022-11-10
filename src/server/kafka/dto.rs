@@ -147,3 +147,14 @@ pub enum SearchStyle {
     CaseSensitive,
     Regex,
 }
+
+#[derive(Serialize)]
+pub struct DecoderMetadata {
+    pub id: String,
+    pub display_name: String,
+}
+
+#[derive(Serialize)]
+pub struct GetDecodersResult {
+    pub decoders: Vec<DecoderMetadata>
+}

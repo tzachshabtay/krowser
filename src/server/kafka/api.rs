@@ -250,6 +250,15 @@ pub fn get_group_members(group: &str) -> Result<Json<dto::GetGroupMembersResult>
     Ok(Json(dto::GetGroupMembersResult{members: members}))
 }
 
+#[get("/api/topic/decoders")]
+pub fn get_decoders() -> Result<Json<dto::GetDecodersResult>, String> {
+    let decoders: Vec<dto::DecoderMetadata>;
+    unsafe {
+        decoders = DECODERS.get_decoders_metadata();
+    }
+    Ok(Json(dto::GetDecodersResult{decoders: decoders}))
+}
+
 #[get("/api/topic/<topic>/consumer_groups")]
 pub fn get_topic_consumer_groups(topic: &str) -> Result<Json<dto::GetTopicConsumerGroupsResult>, String> {
     let offsets = _get_offsets(topic)?;
@@ -450,7 +459,7 @@ fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<dto::TopicOffsets>, wit
     Ok(topic_groups)
 }
 
-#[get("/api/messages/<topic>/<partition>?<limit>&<offset>&<search>&<search_style>&<timeout_millis>&<trace>")]
+#[get("/api/messages/<topic>/<partition>?<limit>&<offset>&<search>&<search_style>&<timeout_millis>&<trace>&<decoding>")]
 pub async fn get_messages(
     topic: &str,
     partition: i32,
@@ -459,15 +468,17 @@ pub async fn get_messages(
     search: Option<&str>,
     search_style: Option<dto::SearchStyle>,
     timeout_millis: Option<u64>,
-    trace: bool) -> Result<Json<dto::GetTopicMessagesResult>, String> {
+    trace: bool,
+    decoding: Option<&str>) -> Result<Json<dto::GetTopicMessagesResult>, String> {
 
     let limit = limit.unwrap_or(100);
     let offset = offset.unwrap_or(0);
     let timeout_millis = timeout_millis.unwrap_or(20000);
     let search_style = search_style.unwrap_or(dto::SearchStyle::None);
-    eprintln!("{:?} {:?} {}", search, search_style, timeout_millis);
+    let decoding = decoding.unwrap_or("");
+    eprintln!("{:?} {:?} {} {}", search, search_style, timeout_millis, decoding);
     match timeout(Duration::from_millis(timeout_millis),
-        _get_messages(topic, partition, limit, offset, search, search_style, trace)).await {
+        _get_messages(topic, partition, limit, offset, search, search_style, trace, decoding)).await {
             Err(_) => Ok(Json(dto::GetTopicMessagesResult{has_timeout: true, messages: Vec::new()})),
             Ok(res) => res,
     }
@@ -479,7 +490,8 @@ async fn _get_messages(topic: &str,
     offset: i64,
     search: Option<&str>,
     search_style: dto::SearchStyle,
-    trace: bool) -> Result<Json<dto::GetTopicMessagesResult>, String> {
+    trace: bool,
+    decoding: &str) -> Result<Json<dto::GetTopicMessagesResult>, String> {
     let regex: Option<Regex> = match search_style {
         dto::SearchStyle::Regex =>
             if let Some(pattern) = &search
@@ -524,8 +536,14 @@ async fn _get_messages(topic: &str,
     let key_decoders: Vec<&Box<dyn Decoder>>;
     let value_decoders: Vec<&Box<dyn Decoder>>;
     unsafe {
-        key_decoders = DECODERS.get_decoders(topic.to_string(), true);
-        value_decoders = DECODERS.get_decoders(topic.to_string(), false);
+        if decoding == "" || decoding == "Auto-Detect" {
+            key_decoders = DECODERS.get_decoders(topic.to_string(), true);
+            value_decoders = DECODERS.get_decoders(topic.to_string(), false);
+        } else {
+            let decoder = DECODERS.get_decoder(decoding)?;
+            key_decoders = vec![decoder];
+            value_decoders = vec![decoder];
+        }
     }
 
     let mut num_consumed = 0;

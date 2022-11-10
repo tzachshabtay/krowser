@@ -14,6 +14,7 @@ export type Broker = { id: number; host: string; port: number }
 export type ConfigEntry = { name: string, value?: string, source: string, is_read_only: boolean, is_default: boolean, is_sensitive: boolean}
 export type GroupMemberMetadata = { member_id: string, client_id: string, client_host: string, metadata: string, assignment: string}
 export type GroupMetadata = { name: string, protocol: string, protocol_type: string, state: string, members: GroupMemberMetadata[]}
+export type DecoderMetadata = { id: string, display_name: string }
 
 export type GetTopicsResult = MaybeError & { topics: TopicMetadata[] }
 export type GetTopicOffsetsResult = MaybeError & { offsets: TopicsOffsets }
@@ -26,6 +27,7 @@ export type GetTopicOffsetByTimestampResult = MaybeError & { offset: number }
 export type GetTopicMessagesResult = MaybeError & TopicMessages
 export type GetGroupsResult = MaybeError & { groups: GroupMetadata[] }
 export type GetGroupMembersResult = MaybeError & { members: GroupMemberMetadata[] }
+export type GetDecodersResult = MaybeError & { decoders: DecoderMetadata[] }
 
 export type GetSubjectsResult = MaybeError & { subjects: string[] }
 export type GetSubjectVersionsResult = MaybeError & { versions: number[] }

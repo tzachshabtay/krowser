@@ -16,6 +16,7 @@ interface Props {
     fromTime?: string;
     toTime?: string;
     searchBy: SearchBy;
+    decoding: string;
     url: Url;
     onDataFetched: (data: FetchData) => void;
     onDataFetchStarted: (partition: string) => void;
@@ -113,6 +114,7 @@ export class MultiTopicsInput extends React.Component<Props, State> {
             fromTime={this.props.fromTime}
             toTime={this.props.toTime}
             searchBy={this.props.searchBy}
+            decoding={this.props.decoding}
             onDataFetched={this.props.onDataFetched}
             onDataFetchStarted={() => { this.setState({loadingMessages: true}); this.props.onDataFetchStarted(AllPartitions)} }
             onDataFetchCompleted={() => this.setState({loadingMessages: false})}

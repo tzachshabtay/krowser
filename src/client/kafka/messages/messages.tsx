@@ -4,7 +4,7 @@ import { KafkaToolbar} from '../../common/toolbar';
 import { DataView} from '../../common/data_view';
 import { ErrorMsg} from '../../common/error_msg';
 import { SingleTopicInput} from './single_topic_input';
-import { SearchBy, AllPartitions, FetchData} from './fetcher';
+import { SearchBy, AllPartitions, FetchData, AutoDetect} from './fetcher';
 import { MultiTopicsInput} from './multi_topics_input';
 import Alert from '@material-ui/lab/Alert';
 import { GridReadyEvent, GridApi, ColumnApi, FilterChangedEvent, ColDef, ValueFormatterParams } from 'ag-grid-community';
@@ -215,6 +215,7 @@ export class Messages extends React.Component<Props, State> {
                         fromTime={this.url.Get(`from_time`)}
                         toTime={this.url.Get(`to_time`)}
                         searchBy={(this.url.Get(`search_by`) ?? `offset`) as SearchBy}
+                        decoding={(this.url.Get(`decoding`)) ?? AutoDetect}
                         selectedTopics={this.props.match.params.topics}
                         >
                     </MultiTopicsInput>
@@ -228,6 +229,7 @@ export class Messages extends React.Component<Props, State> {
                         fromTime={this.url.Get(`from_time`)}
                         toTime={this.url.Get(`to_time`)}
                         searchBy={(this.url.Get(`search_by`) ?? `offset`) as SearchBy}
+                        decoding={(this.url.Get(`decoding`)) ?? AutoDetect}
                         onDataFetched={this.onDataFetched}
                         onDataFetchStarted={this.onDataFetchStarted}
                         >
