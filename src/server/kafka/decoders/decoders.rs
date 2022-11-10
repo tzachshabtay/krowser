@@ -1,6 +1,8 @@
 use crate::kafka::dto::DecoderMetadata;
 use crate::common::errors::map_error;
-use crate::kafka::decoders::avro::AvroCustomDecoder;
+use crate::kafka::decoders::avro::AvroConfluentDecoder;
+use crate::kafka::decoders::bytes::BytesDecoder;
+use crate::kafka::decoders::utf8::Utf8Decoder;
 use crate::config;
 use serverapi::Decoder;
 use std::env;
@@ -36,9 +38,9 @@ impl Decoders {
     }
 
     pub async unsafe fn load_all_plugins(&mut self) -> Result<(), String> {
-        let avro_decoder: AvroCustomDecoder = Default::default();
-        avro_decoder.on_init().await;
-        self.decoders.insert(avro_decoder.id().to_string(), Box::new(avro_decoder));
+        self.add_decoder(Box::new(AvroConfluentDecoder::default()));
+        self.add_decoder(Box::new(Utf8Decoder::default()));
+        self.add_decoder(Box::new(BytesDecoder::default()));
 
         let decoders_dir = "./decoders";
         if !fs::metadata(decoders_dir).is_ok() {
@@ -53,10 +55,17 @@ impl Decoders {
             eprintln!("Loading decoder from: {}", file_path);
             map_error(self.load_plugin(file_path).await)?;
         }
+        for (_, decoder) in &self.decoders {
+            decoder.on_init().await;
+        }
         Ok(())
     }
 
-    pub async unsafe fn load_plugin<P: AsRef<OsStr>>(&mut self, filename: P) -> Result<(), String> {
+    fn add_decoder(&mut self, decoder: Box<dyn Decoder>) {
+        self.decoders.insert(decoder.id().to_string(), decoder);
+    }
+
+    async unsafe fn load_plugin<P: AsRef<OsStr>>(&mut self, filename: P) -> Result<(), String> {
         type PluginCreate = unsafe fn() -> *mut dyn Decoder;
 
         let lib = map_error(Library::new(filename.as_ref()))?;
@@ -73,8 +82,7 @@ impl Decoders {
 
         let plugin = Box::from_raw(boxed_raw);
         eprintln!("Loaded plugin: {}", plugin.id());
-        plugin.on_init().await;
-        self.decoders.insert(plugin.id().to_string(), plugin);
+        self.add_decoder(plugin);
 
         Ok(())
     }

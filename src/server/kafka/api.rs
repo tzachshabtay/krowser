@@ -617,11 +617,7 @@ async fn decode(message: &BorrowedMessage<'_>, attr: DecodingAttribute, decoders
     let payload = message.payload();
     match payload {
         None => Ok(DecodedMessage{contents: DecodedContents{json: Some("".to_string()), schema: None}, decoding: "Empty".to_string()}),
-        Some(buffer) =>
-            match std::str::from_utf8(buffer) {
-                Ok(v) => Ok(DecodedMessage{contents: DecodedContents{json: Some(v.to_string()), schema: None}, decoding: "UTF-8".to_string()}),
-                Err(_) => Ok(DecodedMessage{contents: DecodedContents{json: Some(format!("Unknown message of size {}", buffer.len())), schema: None}, decoding: "Unknown".to_string()}),
-            }
+        Some(buffer) => Ok(DecodedMessage{contents: DecodedContents{json: Some(format!("??? ({} bytes)", buffer.len())), schema: None}, decoding: "Unknown".to_string()}),
     }
 }
 

@@ -12,12 +12,12 @@ use serverapi::{Decoder, DecodingAttribute, DecodedContents};
 use crate::config;
 
 #[derive(Debug, Default)]
-pub struct AvroCustomDecoder {
+pub struct AvroConfluentDecoder {
     settings: RwLock<Option<SrSettings>>,
 }
 
 #[async_trait]
-impl Decoder for AvroCustomDecoder {
+impl Decoder for AvroConfluentDecoder {
     fn id(&self) -> &'static str  {
         "avro_confluent_schema_registry"
     }
@@ -39,7 +39,7 @@ impl Decoder for AvroCustomDecoder {
     }
 }
 
-impl AvroCustomDecoder {
+impl AvroConfluentDecoder {
     async fn decode_payload(&self, payload: Option<&[u8]>) -> Result<DecodedContents, String> {
         match payload {
             None => Ok(DecodedContents{json: None, schema: None}),

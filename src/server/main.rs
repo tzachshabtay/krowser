@@ -10,6 +10,8 @@ mod kafka {
     mod dto;
     mod decoders {
         pub mod avro;
+        pub mod utf8;
+        pub mod bytes;
         pub mod decoders;
     }
 }
