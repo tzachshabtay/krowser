@@ -570,8 +570,7 @@ async fn _get_messages(topic: &str,
                 }
                 let mut filtered_out = false;
                 if let Some(pattern) = search {
-                    let schema = *&decoded_value.contents.schema.as_ref();
-                    let text = format!("{},{},{}", json_key, json_value, schema.unwrap_or(&"".to_string()));
+                    let text = format!("{},{}", json_key, json_value);
                     if !includes(text, pattern.to_string(), &search_style, &regex) {
                         filtered_out = true;
                     }
@@ -584,7 +583,6 @@ async fn _get_messages(topic: &str,
                         timestamp: timestamp,
                         offset: m.offset(),
                         value: json_value.to_string(),
-                        schema_type: decoded_value.contents.schema,
                         key_decoding: decoded_key.decoding,
                         value_decoding: decoded_value.decoding,
                     };
@@ -616,8 +614,8 @@ async fn decode(message: &BorrowedMessage<'_>, attr: DecodingAttribute, decoders
     }
     let payload = message.payload();
     match payload {
-        None => Ok(DecodedMessage{contents: DecodedContents{json: Some("".to_string()), schema: None}, decoding: "Empty".to_string()}),
-        Some(buffer) => Ok(DecodedMessage{contents: DecodedContents{json: Some(format!("??? ({} bytes)", buffer.len())), schema: None}, decoding: "Unknown".to_string()}),
+        None => Ok(DecodedMessage{contents: DecodedContents{json: Some("".to_string())}, decoding: "Empty".to_string()}),
+        Some(buffer) => Ok(DecodedMessage{contents: DecodedContents{json: Some(format!("??? ({} bytes)", buffer.len()))}, decoding: "Unknown".to_string()}),
     }
 }
 

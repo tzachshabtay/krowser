@@ -122,7 +122,6 @@ pub struct TopicMessage {
     pub partition: i32,
     pub value: String,
     pub key: String,
-    pub schema_type: Option<String>,
     pub timestamp: i64,
     pub offset: i64,
     pub key_decoding: String,

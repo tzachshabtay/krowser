@@ -23,7 +23,7 @@ impl Decoder for HelloWorld {
     }
 
     async fn decode(&self, _: &BorrowedMessage, _: &DecodingAttribute) -> Result<DecodedContents, String> {
-        Ok(DecodedContents{json: Some(r#"{"hello_world":true}"#.to_string()), schema: None})
+        Ok(DecodedContents{json: Some(r#"{"hello_world":true}"#.to_string())})
     }
 }
 

@@ -5,6 +5,7 @@ use avro_rs::types::Value;
 use rdkafka::message::BorrowedMessage;
 use rdkafka::message::Message;
 use serde_json::Value as JsonValue;
+use serde_json::json;
 use std::sync::RwLock;
 use serverapi::{Decoder, DecodingAttribute, DecodedContents};
 
@@ -42,14 +43,14 @@ impl Decoder for AvroConfluentDecoder {
 impl AvroConfluentDecoder {
     async fn decode_payload(&self, payload: Option<&[u8]>) -> Result<DecodedContents, String> {
         match payload {
-            None => Ok(DecodedContents{json: None, schema: None}),
+            None => Ok(DecodedContents{json: None}),
             Some(_) => {
                 let mut decoder = AvroDecoder::new(self.settings.read().unwrap().as_ref().unwrap().clone());
                 let task = decoder.decode(payload);
                 match task.await {
                     Err(err) => {
                         eprintln!("error decoding avro: {}", err);
-                        return Ok(DecodedContents{json: None, schema: None});
+                        return Ok(DecodedContents{json: None});
                     },
                     Ok(val) => {
                         let mut decoded_val = val.value;
@@ -64,12 +65,17 @@ impl AvroConfluentDecoder {
                                 eprintln!("error parsing json: {}", err);
                                 json = format!("error parsing json: {}", err);
                             },
-                            Ok(json_val) => json = match serde_json::to_string(&json_val) {
-                                Ok(v) => v,
-                                Err(e) => e.to_string(),
-                            },
+                            Ok(mut json_val) => {
+                                if let Some(map) = json_val.as_object_mut() {
+                                    map.insert("schema_event_type".to_string(), json!(schema));
+                                }
+                                json = match serde_json::to_string(&json_val) {
+                                    Ok(v) => v,
+                                    Err(e) => e.to_string(),
+                                }
+                            }
                         }
-                        return Ok(DecodedContents{json: Some(json), schema: schema});
+                        return Ok(DecodedContents{json: Some(json)});
                     }
                 };
             },

@@ -4,7 +4,6 @@ use std::any::Any;
 
 pub struct DecodedContents {
     pub json: Option<String>,
-    pub schema: Option<String>,
 }
 
 pub enum DecodingAttribute {

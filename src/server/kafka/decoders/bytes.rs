@@ -32,10 +32,10 @@ impl Decoder for BytesDecoder {
 impl BytesDecoder {
     async fn decode_payload(&self, payload: Option<&[u8]>) -> Result<DecodedContents, String> {
         match payload {
-            None => Ok(DecodedContents{json: None, schema: None}),
+            None => Ok(DecodedContents{json: None}),
             Some(buffer) => {
                 let bytes_str: String = buffer.iter().map(|&x| x.to_string() + ",").collect();
-                Ok(DecodedContents{json: Some(format!("{{\"bytes\":\"{}\", \"message_size_in_bytes\":\"{}\"}}", bytes_str, buffer.len()).to_string()), schema: None})
+                Ok(DecodedContents{json: Some(format!("{{\"bytes\":\"{}\", \"message_size_in_bytes\":\"{}\"}}", bytes_str, buffer.len()).to_string())})
             },
         }
     }

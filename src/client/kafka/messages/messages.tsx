@@ -44,7 +44,6 @@ export class Messages extends React.Component<Props, State> {
             rowTimestamp: data.timestamp,
             rowOffset: data.offset,
             rowValue: data.value,
-            rowType: data.schema_type ? data.schema_type : "",
             rowKey: data.key,
             rowTopic: data.topic,
             rowPartition: data.partition,
@@ -107,7 +106,6 @@ export class Messages extends React.Component<Props, State> {
         const cols: ColDef[] = [
             { headerName: "Timestamp", field: "rowTimestamp", valueFormatter: this.timeFormatter },
             { headerName: "Offset", field: "rowOffset", filter: "agNumberColumnFilter" },
-            { headerName: "Type", field: "rowType" }
         ]
         if (this.props.match.params.topic === undefined) {
             cols.push({headerName: "Topic", field: "rowTopic"})
@@ -238,7 +236,7 @@ export class Messages extends React.Component<Props, State> {
                 { this.state.warning && (<Alert severity="warning">{this.state.warning}</Alert>)}
                 <ErrorMsg error={this.state.error} prefix="Failed to fetch data. Error: "></ErrorMsg>
                 <DataView
-                    search={r => `${r.rowValue},${r.rowKey},${r.rowType}`}
+                    search={r => `${r.rowValue},${r.rowKey}`}
                     rows={this.state.rows}
                     raw={this.state.rows.map(r => r.rowJson)}
                     url={this.url}
