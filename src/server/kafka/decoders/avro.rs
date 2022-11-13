@@ -7,10 +7,7 @@ use rdkafka::message::Message;
 use serde_json::Value as JsonValue;
 use serde_json::json;
 use std::sync::RwLock;
-use serverapi::{Decoder, DecodingAttribute, DecodedContents};
-
-
-use crate::config;
+use serverapi::{Decoder, DecodingAttribute, DecodedContents, Config};
 
 #[derive(Debug, Default)]
 pub struct AvroConfluentDecoder {
@@ -27,9 +24,9 @@ impl Decoder for AvroConfluentDecoder {
         "Avro (Confluent Schema Registry)"
     }
 
-    async fn on_init(&self) {
+    async fn on_init(&self, config: Box<dyn Config + Send>) {
         let mut settings = self.settings.write().unwrap();
-        *settings = Some(SrSettings::new((&(*config::SETTINGS).confluent_schema_registry.url).to_string()));
+        *settings = Some(SrSettings::new(config.get_string("confluent-schema-registry.url".to_string()).unwrap()));
     }
 
     async fn decode(&self, message: &BorrowedMessage, attribute: &DecodingAttribute) -> Result<DecodedContents, String> {

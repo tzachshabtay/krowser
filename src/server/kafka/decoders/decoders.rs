@@ -1,3 +1,4 @@
+use crate::config::DynamicConfig;
 use crate::kafka::dto::DecoderMetadata;
 use crate::common::errors::map_error;
 use crate::kafka::decoders::avro::AvroConfluentDecoder;
@@ -56,7 +57,10 @@ impl Decoders {
             map_error(self.load_plugin(file_path).await)?;
         }
         for (_, decoder) in &self.decoders {
-            decoder.on_init().await;
+            let conf = DynamicConfig{};
+            let conf_boxed: Box<dyn serverapi::Config + Send> = Box::new(conf);
+            eprintln!("Initializing decoder {}", decoder.id());
+            decoder.on_init(conf_boxed).await;
         }
         Ok(())
     }

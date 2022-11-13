@@ -50,14 +50,30 @@ pub struct Settings  {
 
 impl Settings {
     pub fn new() -> Result<Self, ConfigError> {
-        let s = Config::builder()
-            .add_source(File::with_name("default"))
-            .add_source(File::with_name("config").required(false))
-            .add_source(Environment::default().prefix("KROWSER").convert_case(Case::Kebab).separator("__"))
-            .build()?;
-
-        s.try_deserialize()
+        get_config()?.try_deserialize()
     }
 }
+
+fn get_config() -> Result<Config, ConfigError> {
+    Config::builder()
+        .add_source(File::with_name("default"))
+        .add_source(File::with_name("config").required(false))
+        .add_source(Environment::default().prefix("KROWSER").convert_case(Case::Kebab).separator("__"))
+        .build()
+}
+
+#[derive(Debug, Default)]
+pub struct DynamicConfig {}
+
+impl serverapi::Config for DynamicConfig {
+    fn get_string(&self, key: String) -> Option<String> {
+        match DYNAMIC_CONFIG.get(&key) {
+            Ok(result) => Some(result),
+            Err(_) => None,
+        }
+    }
+}
+
+static DYNAMIC_CONFIG: Lazy<Config> = Lazy::new(||get_config().unwrap());
 
 pub static SETTINGS: Lazy<Settings> = Lazy::new(||Settings::new().unwrap());

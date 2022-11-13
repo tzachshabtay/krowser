@@ -18,9 +18,6 @@ impl Decoder for BytesDecoder {
         "Bytes"
     }
 
-    async fn on_init(&self) {
-    }
-
     async fn decode(&self, message: &BorrowedMessage, attribute: &DecodingAttribute) -> Result<DecodedContents, String> {
         match attribute {
             DecodingAttribute::Key => self.decode_payload(message.key()).await,

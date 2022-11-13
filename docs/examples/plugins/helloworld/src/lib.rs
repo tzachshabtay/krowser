@@ -18,10 +18,6 @@ impl Decoder for HelloWorld {
         "Hello World"
     }
 
-    async fn on_init(&self) {
-        format!("HelloWorld loaded");
-    }
-
     async fn decode(&self, _: &BorrowedMessage, _: &DecodingAttribute) -> Result<DecodedContents, String> {
         Ok(DecodedContents{json: Some(r#"{"hello_world":true}"#.to_string())})
     }

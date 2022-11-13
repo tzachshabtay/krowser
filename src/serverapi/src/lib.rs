@@ -11,6 +11,10 @@ pub enum DecodingAttribute {
     Value,
 }
 
+pub trait Config {
+    fn get_string(&self, key: String) -> Option<String>;
+}
+
 #[async_trait]
 pub trait Decoder: Any + Send + Sync {
     /// An id for the decoder (will appear in the configuration file for selecting decoders per topic).
@@ -20,7 +24,7 @@ pub trait Decoder: Any + Send + Sync {
     fn display_name(&self) -> &'static str;
 
     /// This is called on startup to enable initializiing resources.
-    async fn on_init(&self);
+    async fn on_init(&self, _config: Box<dyn Config + Send>) {}
 
     /// Should attempt to decode a kafka message's key/value into json (the attribute instructs whether to decode the key or the value).
     /// If the key/value is not encoded in a protocol the decoder understands,
@@ -31,7 +35,6 @@ pub trait Decoder: Any + Send + Sync {
     /// A callback fired immediately before the plugin is unloaded. Use this if
     /// you need to do any cleanup.
     fn on_unload(&self) {}
-
 }
 
 /*
