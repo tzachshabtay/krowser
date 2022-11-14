@@ -1,0 +1,7 @@
+[configdemo]
+demo-var = "hello from config-demo"
+
+[[kafka.kafka-topics]]
+name = "test*"
+key-decoders = "hello_world"
+value-decoders = "config_demo"
