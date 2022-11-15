@@ -1,5 +1,6 @@
 import React from "react";
 import TextField from '@material-ui/core/TextField';
+import CircularProgress from '@material-ui/core/CircularProgress';
 import LinearProgress from '@material-ui/core/LinearProgress';
 import Select from '@material-ui/core/Select';
 import InputLabel from '@material-ui/core/InputLabel';
@@ -13,12 +14,13 @@ import { Url } from '../../common/url';
 import { SearchStyle } from '../../../shared/search';
 import Box from '@material-ui/core/Box';
 import Typography from '@material-ui/core/Typography';
-import { GetTopicMessagesResult, GetTopicOffsetByTimestampResult, GetTopicOffsetsResult, TopicOffsets } from "../../../shared/api";
+import { DecoderMetadata, GetDecodersResult, GetTopicMessagesResult, GetTopicOffsetByTimestampResult, GetTopicOffsetsResult, TopicOffsets } from "../../../shared/api";
 import { CancelToken, Loader } from "../../common/loader";
 
 export type SearchBy = "offset" | "time" | "newest" | "oldest";
 
 export const AllPartitions = `all`;
+export const AutoDetect = `Auto-Detect`;
 
 export type Progress = {
     min: number;
@@ -40,6 +42,7 @@ interface Props {
     limit?: number;
     fromTime?: string;
     toTime?: string;
+    decoding?: string;
     searchBy: SearchBy;
     onDataFetched: (data: FetchData) => void;
     onDataFetchStarted: (partition: string) => void;
@@ -55,9 +58,13 @@ type State = {
     searchBy: SearchBy;
     offset: number | "";
     limit: number | "";
+    decoding: string;
     fromTime: string;
     toTime: string;
     progress: Progress;
+    loadingDecoders: boolean;
+    decoders: DecoderMetadata[];
+    error: string;
 }
 
 export type FetchData = GetTopicMessagesResult | null;
@@ -121,6 +128,7 @@ export class Fetcher extends React.Component<Props, State> {
         fromTime: this.props.fromTime ?? "",
         toTime: this.props.toTime ?? "",
         searchBy: this.props.searchBy ?? `offset`,
+        decoding: this.props.decoding ?? AutoDetect,
         progress: {
             min: 0,
             max: 0,
@@ -129,6 +137,9 @@ export class Fetcher extends React.Component<Props, State> {
             partition: "",
             topic: "",
         },
+        loadingDecoders: true,
+        decoders: [],
+        error: this.props.error,
     }
     loader: Loader = new Loader()
 
@@ -136,12 +147,24 @@ export class Fetcher extends React.Component<Props, State> {
 
     async componentDidMount() {
         this.updateUrl()
+        await this.fetchDecoders();
         await this.fetchData(this.preloadMessages)
     }
 
     componentWillUnmount() {
         this.props.url.Unsubscribe(this.onUrlChanged)
         this.loader.Abort()
+    }
+
+    async fetchDecoders() {
+        const response = await fetch(`/api/topic/decoders`)
+        const data: GetDecodersResult = await response.json()
+        if (data.error) {
+            this.setState({loadingDecoders: false, error: data.error})
+            return
+        }
+        const newState: Pick<State, keyof State> = { ...this.state, loadingDecoders: false, decoders: [{id: AutoDetect, display_name: AutoDetect }, ...data.decoders] }
+        this.setState(newState)
     }
 
     fetchData = async (fn: (cancelToken: CancelToken) => Promise<void>) => {
@@ -349,7 +372,7 @@ export class Fetcher extends React.Component<Props, State> {
                 topic: this.props.topics.length > 1 ? `Topic ${topic}, ` : "",
             }})
             const data: GetTopicMessagesResult = await cancelToken.Fetch(
-                `/api/messages/${topic}/${partition}?limit=${limit}&offset=${cursor}&search=${encodeURIComponent(this.state.search)}&search_style=${this.state.searchStyle}&timeout_millis=${timeout}`,
+                `/api/messages/${topic}/${partition}?limit=${limit}&offset=${cursor}&search=${encodeURIComponent(this.state.search)}&search_style=${this.state.searchStyle}&timeout_millis=${timeout}&decoding=${encodeURIComponent(this.state.decoding)}`,
             )
             if (cancelToken.Aborted) {
                 break
@@ -390,10 +413,15 @@ export class Fetcher extends React.Component<Props, State> {
             {name: `limit`, val: this.state.searchBy !== "time" ? this.state.limit.toString() : ""},
             {name: `from_time`, val: this.state.searchBy === "time" ? this.state.fromTime.toString() : ""},
             {name: `to_time`, val: this.state.searchBy === "time" ? this.state.toTime.toString() : ""},
+            {name: `decoding`, val: this.state.decoding === AutoDetect ? "" : this.state.decoding},
         )
     }
 
     render() {
+        if (this.state.loadingDecoders) {
+            return (<><CircularProgress /><div>Loading...</div></>)
+        }
+        const decoders = this.state.decoders.map(p => (<MenuItem key={p.display_name} value={p.id}>{p.display_name}</MenuItem>))
         return (
             <>
             <Toolbar>
@@ -444,6 +472,19 @@ export class Fetcher extends React.Component<Props, State> {
                     onEnter={async () => { await this.onFetchMessagesClicked() }}
                 ></DateTimeField>
                 </>}
+                <FormControl style={{ margin: 16, minWidth: 120 }}>
+                        <InputLabel htmlFor="decoding-select">Decoding</InputLabel>
+                        <Select
+                            value={this.state.decoding}
+                            onChange={(e: React.ChangeEvent<{ name?: string; value: unknown }>) => this.setState({ decoding: e.target.value as string }, () => { this.updateUrl(); this.props.url.Refresh(); })}
+                            inputProps={{
+                                name: 'decoding',
+                                id: 'decoding-select',
+                            }}
+                        >
+                            {decoders}
+                        </Select>
+                </FormControl>
                 </div>
                 <GoButton
                     onRun={this.onFetchMessagesClicked}
@@ -451,7 +492,7 @@ export class Fetcher extends React.Component<Props, State> {
                     isRunning={this.props.loadingMessages}>
                 </GoButton>
             </Toolbar>
-            <ErrorMsg error={this.props.error} prefix={this.props.errorPrefix}></ErrorMsg>
+            <ErrorMsg error={this.state.error} prefix={this.props.errorPrefix}></ErrorMsg>
             {this.renderProgress()}
             </>
         )

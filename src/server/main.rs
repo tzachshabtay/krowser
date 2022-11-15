@@ -9,8 +9,10 @@ mod kafka {
     pub mod api;
     mod dto;
     mod decoders {
-        pub mod api;
         pub mod avro;
+        pub mod utf8;
+        pub mod bytes;
+        pub mod decoders;
     }
 }
 mod kafka_connect {
@@ -49,7 +51,7 @@ fn assets() -> &'static str {
 #[launch]
 fn rocket() -> _ {
     let figment = rocket::Config::figment()
-        .merge(("port", *config::SERVER_PORT));
+        .merge(("port", (*config::SETTINGS).server.port));
 
     rocket::custom(figment).mount("/", routes![
         index,
@@ -65,6 +67,7 @@ fn rocket() -> _ {
         kafka::api::get_groups,
         kafka::api::get_group_members,
         kafka::api::get_offset_for_timestamp,
+        kafka::api::get_decoders,
         kafka_connect::api::get_connectors,
         kafka_connect::api::get_connector_status,
         kafka_connect::api::get_connector_config,

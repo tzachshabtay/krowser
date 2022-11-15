@@ -8,5 +8,5 @@ services:
       ports:
         - "9999:9999"
       environment:
-        KAFKA_URL: localhost:9092
-        SCHEMA_REGISTRY_URL: http://localhost:8081
+        KROWSER__KAFKA__URLS: localhost:9092
+        KROWSER__CONFLUENT_SCHEMA_REGISTRY__URL: http://localhost:8081

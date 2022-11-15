@@ -9,10 +9,16 @@ Web UI to browse [kafka](https://kafka.apache.org/), [schema registry](https://d
 ## Features
 
 - View kafka's topics, partitions, messages, consumer groups and brokers.
-- View schema registry's subjects and schemas.
+- View Confluent schema registry's subjects and schemas.
 - View kafka-connect's connectors and tasks.
 - The grid view destructures the messages/schemas (even nested json) into separate columns, and each of the columns can be (client-side) filtered and sorted.
-- Support for avro auto-detecting and decoding (via the schema registry). Different subject messages in a topic are supported as well (and as you filter for a specific event type it auto-hides all of the irrelevant columns belonging to the other messages).
+- A decoding framework that allows for decoding messages by either auto-detecting the format from a configured list of decoders (with the ability to specify a different list of decoders for different topics or groups of topics) or by selecting the decoding from a list in the UI.
+- Write your own custom decoder by implementing an interface, see [example](./docs/examples/plugins/readme.md).
+- Or, use one of the built-in decoders:
+    - Avro (using Confluent schema registry)
+    - UTF-8
+    - Raw bytes
+- The decoding framework supports different decoded messages in the same topic, and different decodings for keys and values for the same message. The avro decoder supports different subject messages in a topic. As you filter for a specific event type it auto-hides all of the irrelevant columns belonging to the other messages.
 - The raw view shows the data in json format, and allows easy copying to clipboard
 - Server-side search for messages and the ability to search multiple topics at once
 - Filter messages via time range (or offsets/newest/oldest)
@@ -36,9 +42,13 @@ A [docker](https://www.docker.com/) image is available in [dockerhub](https://hu
 Run it via: `docker run -it -p 9999:9999 tzachs/krowser`
 
 If you need to configure URLs (of kafka, schema registry), you can run, for example (if you need to run against local kafka and schema-registry):
-`docker run -it -p 9999:9999 --env KAFKA_URL=host.docker.internal:9092 --env SCHEMA_REGISTRY_URL=host.docker.internal:8081 tzachs/krowser`
+`docker run -it -p 9999:9999 --env KROWSER__KAFKA__URLS=host.docker.internal:9092 --env KROWSER__CONFLUENT_SCHEMA_REGISTRY__URL=host.docker.internal:8081 tzachs/krowser`
 
-All available environment variable configurations can be seen in [the config file](./src/server/config.rs).
+Alternatively, you can use a `config.toml` config file to specify configurations. It needs to be placed in the same folder as the krowser binary (or in the `src/server` folder if you're running from source).
+
+All available configurations can be seen in [the default config file](./src/server/default.toml).
+
+Note that for specifying custom decoders for specific topics you have to use a config file, this is currently not supported via environment variables.
 
 A [docker-compose example](./docs/examples/docker-compose.yml) is also available.
 
@@ -52,5 +62,3 @@ A [docker-compose example](./docs/examples/docker-compose.yml) is also available
 - If you need local kafka and schema registry (and zookeeper), run `npm run kafka-up`, and wait a few minutes (and run `npm run kafka-down` to shut those down)
 - If you need dummy messages to be inserted to kafka, run `npm run insert-events`
 - To build the docker image, run: `docker build -t krowser .`
-
-

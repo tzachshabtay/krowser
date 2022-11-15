@@ -1,0 +1,32 @@
+[kafka]
+# A comma-separated list of URLs for the kafka brokers
+urls = "localhost:9092"
+
+# Two comma-separated lists of default decoders for decoding the key/value in kafka messages.
+# The decoders will be used from first to last until a decoder is able to decode the message.
+# The list of decoders can be overridden for specific topics (or groups of topics), an example:
+#
+# [[kafka.kafka-topics]]
+# name = "test*"
+# key-decoders = "utf8"
+# value-decoders = "my_decoder,utf8"
+#
+# In this exaemple, for all topics that start with "test" (matched by a regular expression), auto-detection will use utf-8
+# for decoding the keys, and "my_decoder" (which is assumed to be a user written and installed decoder) will be first used to decode values,
+# and will fallback to utf-8 decoding if that fails.
+#
+# See the plugins example for how to write and install a custom decoder.
+key-decoders = "avro_confluent_schema_registry,utf8"
+value-decoders = "avro_confluent_schema_registry,utf8"
+
+[confluent-schema-registry]
+# The url used to connect to the confluent schema registry.
+url = "http://localhost:8081"
+
+[kafka-connect]
+# The url used to connect to the kafka-connect cluster.
+url = "http://localhost:8083"
+
+[server]
+# The port on which the server listens for requests.
+port = 9999

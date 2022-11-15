@@ -5,44 +5,49 @@ use avro_rs::types::Value;
 use rdkafka::message::BorrowedMessage;
 use rdkafka::message::Message;
 use serde_json::Value as JsonValue;
-
-use crate::config;
-use crate::kafka::decoders::api;
+use serde_json::json;
+use std::sync::RwLock;
+use serverapi::{Decoder, DecodingAttribute, DecodedContents, Config};
 
 #[derive(Debug, Default)]
-pub struct AvroCustomDecoder {
-    settings: Option<SrSettings>,
+pub struct AvroConfluentDecoder {
+    settings: RwLock<Option<SrSettings>>,
 }
 
 #[async_trait]
-impl api::Decoder for AvroCustomDecoder {
-    fn name(&self) -> &'static str  {
+impl Decoder for AvroConfluentDecoder {
+    fn id(&self) -> &'static str  {
+        "avro_confluent_schema_registry"
+    }
+
+    fn display_name(&self) -> &'static str  {
         "Avro (Confluent Schema Registry)"
     }
 
-    async fn on_init(&mut self) {
-        self.settings = Some(SrSettings::new((&*config::SCHEMA_REGISTRY_URL).to_string()));
+    async fn on_init(&self, config: Box<dyn Config + Send>) {
+        let mut settings = self.settings.write().unwrap();
+        *settings = Some(SrSettings::new(config.get_string("confluent-schema-registry.url".to_string()).unwrap()));
     }
 
-    async fn decode(&self, message: &BorrowedMessage, attribute: &api::DecodingAttribute) -> Result<api::DecodedContents, String> {
+    async fn decode(&self, message: &BorrowedMessage, attribute: &DecodingAttribute) -> Result<DecodedContents, String> {
         match attribute {
-            api::DecodingAttribute::Key => self.decode_payload(message.key()).await,
-            api::DecodingAttribute::Value => self.decode_payload(message.payload()).await,
+            DecodingAttribute::Key => self.decode_payload(message.key()).await,
+            DecodingAttribute::Value => self.decode_payload(message.payload()).await,
         }
     }
 }
 
-impl AvroCustomDecoder {
-    async fn decode_payload(&self, payload: Option<&[u8]>) -> Result<api::DecodedContents, String> {
+impl AvroConfluentDecoder {
+    async fn decode_payload(&self, payload: Option<&[u8]>) -> Result<DecodedContents, String> {
         match payload {
-            None => Ok(api::DecodedContents{json: None, schema: None}),
+            None => Ok(DecodedContents{json: None}),
             Some(_) => {
-                let mut decoder = AvroDecoder::new(self.settings.as_ref().unwrap().clone());
+                let mut decoder = AvroDecoder::new(self.settings.read().unwrap().as_ref().unwrap().clone());
                 let task = decoder.decode(payload);
                 match task.await {
                     Err(err) => {
                         eprintln!("error decoding avro: {}", err);
-                        return Ok(api::DecodedContents{json: None, schema: None});
+                        return Ok(DecodedContents{json: None});
                     },
                     Ok(val) => {
                         let mut decoded_val = val.value;
@@ -57,12 +62,17 @@ impl AvroCustomDecoder {
                                 eprintln!("error parsing json: {}", err);
                                 json = format!("error parsing json: {}", err);
                             },
-                            Ok(json_val) => json = match serde_json::to_string(&json_val) {
-                                Ok(v) => v,
-                                Err(e) => e.to_string(),
-                            },
+                            Ok(mut json_val) => {
+                                if let Some(map) = json_val.as_object_mut() {
+                                    map.insert("schema_event_type".to_string(), json!(schema));
+                                }
+                                json = match serde_json::to_string(&json_val) {
+                                    Ok(v) => v,
+                                    Err(e) => e.to_string(),
+                                }
+                            }
                         }
-                        return Ok(api::DecodedContents{json: Some(json), schema: schema});
+                        return Ok(DecodedContents{json: Some(json)});
                     }
                 };
             },

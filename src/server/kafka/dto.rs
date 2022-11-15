@@ -122,9 +122,10 @@ pub struct TopicMessage {
     pub partition: i32,
     pub value: String,
     pub key: String,
-    pub schema_type: Option<String>,
     pub timestamp: i64,
     pub offset: i64,
+    pub key_decoding: String,
+    pub value_decoding: String,
 }
 
 #[derive(Serialize)]
@@ -144,4 +145,15 @@ pub enum SearchStyle {
     #[field(value = "case-sensitive")]
     CaseSensitive,
     Regex,
+}
+
+#[derive(Serialize)]
+pub struct DecoderMetadata {
+    pub id: String,
+    pub display_name: String,
+}
+
+#[derive(Serialize)]
+pub struct GetDecodersResult {
+    pub decoders: Vec<DecoderMetadata>
 }

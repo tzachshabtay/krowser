@@ -30,8 +30,8 @@ use regex::Regex;
 use crate::config;
 use crate::kafka::dto;
 use crate::common::errors::{map_error, retry};
-use crate::kafka::decoders::avro::AvroCustomDecoder;
-use crate::kafka::decoders::api::{Decoder, DecodingAttribute, DecodedContents};
+use crate::kafka::decoders::decoders::DECODERS;
+use serverapi::{Decoder, DecodingAttribute, DecodedContents};
 
 struct CustomContext;
 
@@ -100,16 +100,16 @@ fn kafka_retry<C, T, E: std::fmt::Debug>(
 }
 
 fn base_consumer() -> KafkaResult<BaseConsumer> {
-    println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
+    println!("Connecting to kafka at: {}", (*config::SETTINGS).kafka.urls);
     ClientConfig::new()
-        .set("bootstrap.servers", &*config::KAFKA_URLS)
+        .set("bootstrap.servers", &(*config::SETTINGS).kafka.urls)
         .create()
 }
 
 fn group_consumer(group: &str) -> KafkaResult<BaseConsumer> {
-    println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
+    println!("Connecting to kafka at: {}", (*config::SETTINGS).kafka.urls);
     ClientConfig::new()
-        .set("bootstrap.servers", &*config::KAFKA_URLS)
+        .set("bootstrap.servers", &(*config::SETTINGS).kafka.urls)
         .set("group.id", group)
         .set("enable.auto.commit", "false")
         .create()
@@ -161,7 +161,7 @@ pub fn get_topic(topic: &str) -> Result<Json<dto::GetTopicResult>, String> {
 #[get("/api/topic/<topic>/config")]
 pub async fn get_topic_configs(topic: &str) -> Result<Json<dto::GetTopicConfigsResult>, String> {
     let client: AdminClient<DefaultClientContext> = map_error(ClientConfig::new()
-        .set("bootstrap.servers", &*config::KAFKA_URLS).create())?;
+        .set("bootstrap.servers", &(*config::SETTINGS).kafka.urls).create())?;
 
     let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(5)));
     let configs: Vec<ConfigResourceResult> = map_error(client.describe_configs(&[
@@ -176,7 +176,7 @@ pub async fn get_topic_configs(topic: &str) -> Result<Json<dto::GetTopicConfigsR
 #[get("/api/broker/<broker>/config")]
 pub async fn get_broker_configs(broker: i32) -> Result<Json<dto::GetBrokerConfigsResult>, String> {
     let client: AdminClient<DefaultClientContext> = map_error(ClientConfig::new()
-        .set("bootstrap.servers", &*config::KAFKA_URLS).create())?;
+        .set("bootstrap.servers", &(*config::SETTINGS).kafka.urls).create())?;
 
     let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(5)));
     let configs: Vec<ConfigResourceResult> = map_error(client.describe_configs(&[
@@ -248,6 +248,15 @@ pub fn get_group_members(group: &str) -> Result<Json<dto::GetGroupMembersResult>
     let members = _get_members(&group);
 
     Ok(Json(dto::GetGroupMembersResult{members: members}))
+}
+
+#[get("/api/topic/decoders")]
+pub fn get_decoders() -> Result<Json<dto::GetDecodersResult>, String> {
+    let decoders: Vec<dto::DecoderMetadata>;
+    unsafe {
+        decoders = DECODERS.get_decoders_metadata();
+    }
+    Ok(Json(dto::GetDecodersResult{decoders: decoders}))
 }
 
 #[get("/api/topic/<topic>/consumer_groups")]
@@ -450,7 +459,7 @@ fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<dto::TopicOffsets>, wit
     Ok(topic_groups)
 }
 
-#[get("/api/messages/<topic>/<partition>?<limit>&<offset>&<search>&<search_style>&<timeout_millis>&<trace>")]
+#[get("/api/messages/<topic>/<partition>?<limit>&<offset>&<search>&<search_style>&<timeout_millis>&<trace>&<decoding>")]
 pub async fn get_messages(
     topic: &str,
     partition: i32,
@@ -459,15 +468,17 @@ pub async fn get_messages(
     search: Option<&str>,
     search_style: Option<dto::SearchStyle>,
     timeout_millis: Option<u64>,
-    trace: bool) -> Result<Json<dto::GetTopicMessagesResult>, String> {
+    trace: bool,
+    decoding: Option<&str>) -> Result<Json<dto::GetTopicMessagesResult>, String> {
 
     let limit = limit.unwrap_or(100);
     let offset = offset.unwrap_or(0);
     let timeout_millis = timeout_millis.unwrap_or(20000);
     let search_style = search_style.unwrap_or(dto::SearchStyle::None);
-    eprintln!("{:?} {:?} {}", search, search_style, timeout_millis);
+    let decoding = decoding.unwrap_or("");
+    eprintln!("{:?} {:?} {} {}", search, search_style, timeout_millis, decoding);
     match timeout(Duration::from_millis(timeout_millis),
-        _get_messages(topic, partition, limit, offset, search, search_style, trace)).await {
+        _get_messages(topic, partition, limit, offset, search, search_style, trace, decoding)).await {
             Err(_) => Ok(Json(dto::GetTopicMessagesResult{has_timeout: true, messages: Vec::new()})),
             Ok(res) => res,
     }
@@ -479,7 +490,8 @@ async fn _get_messages(topic: &str,
     offset: i64,
     search: Option<&str>,
     search_style: dto::SearchStyle,
-    trace: bool) -> Result<Json<dto::GetTopicMessagesResult>, String> {
+    trace: bool,
+    decoding: &str) -> Result<Json<dto::GetTopicMessagesResult>, String> {
     let regex: Option<Regex> = match search_style {
         dto::SearchStyle::Regex =>
             if let Some(pattern) = &search
@@ -510,9 +522,9 @@ async fn _get_messages(topic: &str,
         return Err(format!("partition {} not found for topic {}", partition, topic))
     }
 
-    println!("Connecting to kafka at: {}", *config::KAFKA_URLS);
+    println!("Connecting to kafka at: {}", (*config::SETTINGS).kafka.urls);
     let consumer: LoggingConsumer = retry("connecting consumer", &mut || ClientConfig::new()
-        .set("bootstrap.servers", &*config::KAFKA_URLS)
+        .set("bootstrap.servers", &(*config::SETTINGS).kafka.urls)
         .set("group.id", "krowser")
         .set("enable.auto.commit", "false")
         .create_with_context(CustomContext))?;
@@ -521,10 +533,17 @@ async fn _get_messages(topic: &str,
     map_error(assignment.add_partition_offset(topic, partition, rdkafka::Offset::Offset(offset)))?;
     retry("assigning consumer", &mut || consumer.assign(&assignment))?;
 
-    let mut avro_decoder: AvroCustomDecoder = Default::default();
-    let mut decoders: Vec<&mut dyn Decoder> = vec![&mut avro_decoder];
-    for decoder in decoders.iter_mut() {
-        decoder.on_init().await;
+    let key_decoders: Vec<&Box<dyn Decoder>>;
+    let value_decoders: Vec<&Box<dyn Decoder>>;
+    unsafe {
+        if decoding == "" || decoding == "Auto-Detect" {
+            key_decoders = DECODERS.get_decoders(topic.to_string(), true);
+            value_decoders = DECODERS.get_decoders(topic.to_string(), false);
+        } else {
+            let decoder = DECODERS.get_decoder(decoding)?;
+            key_decoders = vec![decoder];
+            value_decoders = vec![decoder];
+        }
     }
 
     let mut num_consumed = 0;
@@ -541,18 +560,17 @@ async fn _get_messages(topic: &str,
                     Timestamp::CreateTime(v) => v,
                     Timestamp::LogAppendTime(v) => v,
                 };
-                let decoded_value = decode(&m, DecodingAttribute::Value, &decoders).await?;
-                let json_value = &decoded_value.json.unwrap();
-                let decoded_key = decode(&m, DecodingAttribute::Key, &decoders).await?;
-                let json_key = &decoded_key.json.unwrap();
+                let decoded_value = decode(&m, DecodingAttribute::Value, &value_decoders).await?;
+                let json_value = &decoded_value.contents.json.unwrap();
+                let decoded_key = decode(&m, DecodingAttribute::Key, &key_decoders).await?;
+                let json_key = &decoded_key.contents.json.unwrap();
                 if trace {
                     eprintln!("key: '{:?}', value: {:?}, topic: {}, offset: {}, timestamp: {:?}",
                         json_key, json_value, m.topic(), m.offset(), timestamp);
                 }
                 let mut filtered_out = false;
                 if let Some(pattern) = search {
-                    let schema = *&decoded_value.schema.as_ref();
-                    let text = format!("{},{},{}", json_key, json_value, schema.unwrap_or(&"".to_string()));
+                    let text = format!("{},{}", json_key, json_value);
                     if !includes(text, pattern.to_string(), &search_style, &regex) {
                         filtered_out = true;
                     }
@@ -565,7 +583,8 @@ async fn _get_messages(topic: &str,
                         timestamp: timestamp,
                         offset: m.offset(),
                         value: json_value.to_string(),
-                        schema_type: decoded_value.schema,
+                        key_decoding: decoded_key.decoding,
+                        value_decoding: decoded_value.decoding,
                     };
                     messages.push(msg);
                 }
@@ -581,21 +600,22 @@ async fn _get_messages(topic: &str,
     }))
 }
 
-async fn decode(message: &BorrowedMessage<'_>, attr: DecodingAttribute, decoders: &Vec<&mut dyn Decoder>) -> Result<DecodedContents, String>{
+pub struct DecodedMessage {
+    pub contents: DecodedContents,
+    pub decoding: String,
+}
+
+async fn decode(message: &BorrowedMessage<'_>, attr: DecodingAttribute, decoders: &Vec<&Box<dyn Decoder>>) -> Result<DecodedMessage, String>{
     for decoder in decoders {
         let result = decoder.decode(message, &attr).await?;
         if let Some(_) = result.json {
-            return Ok(result);
+            return Ok(DecodedMessage{contents: result, decoding: decoder.display_name().to_string()});
         }
     }
     let payload = message.payload();
     match payload {
-        None => Ok(DecodedContents{json: Some("".to_string()), schema: None}),
-        Some(buffer) =>
-            match std::str::from_utf8(buffer) {
-                Ok(v) => Ok(DecodedContents{json: Some(v.to_string()), schema: None}),
-                Err(_) => Ok(DecodedContents{json: Some("Non-Utf8".to_string()), schema: None}),
-            }
+        None => Ok(DecodedMessage{contents: DecodedContents{json: Some("".to_string())}, decoding: "Empty".to_string()}),
+        Some(buffer) => Ok(DecodedMessage{contents: DecodedContents{json: Some(format!("??? ({} bytes)", buffer.len()))}, decoding: "Unknown".to_string()}),
     }
 }
 

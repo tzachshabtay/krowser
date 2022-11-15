@@ -4,7 +4,7 @@ import { KafkaToolbar} from '../../common/toolbar';
 import { DataView} from '../../common/data_view';
 import { ErrorMsg} from '../../common/error_msg';
 import { SingleTopicInput} from './single_topic_input';
-import { SearchBy, AllPartitions, FetchData} from './fetcher';
+import { SearchBy, AllPartitions, FetchData, AutoDetect} from './fetcher';
 import { MultiTopicsInput} from './multi_topics_input';
 import Alert from '@material-ui/lab/Alert';
 import { GridReadyEvent, GridApi, ColumnApi, FilterChangedEvent, ColDef, ValueFormatterParams } from 'ag-grid-community';
@@ -44,10 +44,11 @@ export class Messages extends React.Component<Props, State> {
             rowTimestamp: data.timestamp,
             rowOffset: data.offset,
             rowValue: data.value,
-            rowType: data.schema_type ? data.schema_type : "",
             rowKey: data.key,
             rowTopic: data.topic,
             rowPartition: data.partition,
+            rowKeyDecoding: data.key_decoding,
+            rowValueDecoding: data.value_decoding,
         }
         let cols = {}
         let rowValue: any = data.value
@@ -105,7 +106,6 @@ export class Messages extends React.Component<Props, State> {
         const cols: ColDef[] = [
             { headerName: "Timestamp", field: "rowTimestamp", valueFormatter: this.timeFormatter },
             { headerName: "Offset", field: "rowOffset", filter: "agNumberColumnFilter" },
-            { headerName: "Type", field: "rowType" }
         ]
         if (this.props.match.params.topic === undefined) {
             cols.push({headerName: "Topic", field: "rowTopic"})
@@ -116,6 +116,8 @@ export class Messages extends React.Component<Props, State> {
         this.addCustomColumns(cols, this.state.customCols.cols, ``)
         cols.push({headerName: "Key", field: "rowKey"})
         cols.push({headerName: "Value", field: "rowValue"})
+        cols.push({headerName: "Key Decoding", field: "rowKeyDecoding"})
+        cols.push({headerName: "Value Decoding", field: "rowValueDecoding"})
         return cols
     }
 
@@ -211,6 +213,7 @@ export class Messages extends React.Component<Props, State> {
                         fromTime={this.url.Get(`from_time`)}
                         toTime={this.url.Get(`to_time`)}
                         searchBy={(this.url.Get(`search_by`) ?? `offset`) as SearchBy}
+                        decoding={(this.url.Get(`decoding`)) ?? AutoDetect}
                         selectedTopics={this.props.match.params.topics}
                         >
                     </MultiTopicsInput>
@@ -224,6 +227,7 @@ export class Messages extends React.Component<Props, State> {
                         fromTime={this.url.Get(`from_time`)}
                         toTime={this.url.Get(`to_time`)}
                         searchBy={(this.url.Get(`search_by`) ?? `offset`) as SearchBy}
+                        decoding={(this.url.Get(`decoding`)) ?? AutoDetect}
                         onDataFetched={this.onDataFetched}
                         onDataFetchStarted={this.onDataFetchStarted}
                         >
@@ -232,7 +236,7 @@ export class Messages extends React.Component<Props, State> {
                 { this.state.warning && (<Alert severity="warning">{this.state.warning}</Alert>)}
                 <ErrorMsg error={this.state.error} prefix="Failed to fetch data. Error: "></ErrorMsg>
                 <DataView
-                    search={r => `${r.rowValue},${r.rowKey},${r.rowType}`}
+                    search={r => `${r.rowValue},${r.rowKey}`}
                     rows={this.state.rows}
                     raw={this.state.rows.map(r => r.rowJson)}
                     url={this.url}
