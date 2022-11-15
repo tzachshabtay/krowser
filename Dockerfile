@@ -1,4 +1,4 @@
-FROM ubuntu:18.04 as build-api
+FROM debian:buster-slim as build-api
 
 RUN apt-get update && apt-get install -y build-essential \
     curl \
