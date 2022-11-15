@@ -1,4 +1,4 @@
-FROM ubuntu:18.04 as build
+FROM ubuntu:18.04 as build-api
 
 RUN apt-get update && apt-get install -y build-essential \
     curl \
@@ -21,10 +21,18 @@ ENV CXX clang++
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH /root/.cargo/bin/:$PATH
 
+# Build the api
+WORKDIR /src/serverapi
+COPY ./src/serverapi ./
+RUN cargo build --release
+
+FROM build-api as build-krowser
+
 # Create a new empty shell project
-RUN USER=root cargo new --bin krowser
-RUN echo "fn main() {}" > /krowser/main.rs
-WORKDIR /krowser
+WORKDIR /src
+RUN USER=root cargo new --bin server
+RUN echo "fn main() {}" > ./server/main.rs
+WORKDIR /src/server
 
 # Copy our manifests
 COPY ./src/server/Cargo.lock ./Cargo.lock
@@ -38,14 +46,15 @@ RUN rm ./*.rs
 COPY ./src/server ./
 
 # Build for release.
-RUN rm ./target/release/deps/krowser*
+RUN rm ./target/release/krowser*
 RUN cargo build --release
 
 FROM node:12.18.0-buster AS base
 WORKDIR /usr/src/krowser
 COPY package*.json ./
 # Copy from the previous build
-COPY --from=build /krowser/target/release/krowser /usr/src/krowser
+COPY --from=build-krowser /src/server/target/release/krowser /usr/src/krowser
+COPY ./src/server/default.toml .
 RUN chmod +x /usr/src/krowser
 
 
