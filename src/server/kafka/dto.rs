@@ -39,14 +39,14 @@ pub struct TopicOffsets {
     pub low: i64,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct ConsumerGroupOffsets {
     pub metadata: Option<String>,
     pub offset: i64,
     pub partition_offsets: TopicOffsets,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct TopicConsumerGroup {
     pub group_id: String,
     pub offsets: Vec<ConsumerGroupOffsets>,
@@ -57,7 +57,7 @@ pub struct GetTopicOffsetsResult {
     pub offsets: Vec<TopicOffsets>
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct GetTopicResult {
     pub offsets: Vec<TopicOffsets>,
     pub consumer_groups: Vec<TopicConsumerGroup>

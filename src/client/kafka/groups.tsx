@@ -74,7 +74,7 @@ export class Groups extends React.Component<RouteComponentProps, State> {
                 {this.state.loading && <><CircularProgress /><div>Loading...</div></>}
                 <ErrorMsg error={this.state.error} prefix="Failed to fetch groups. Error: "></ErrorMsg>
                 {!this.state.loading && <DataView
-                    search={r => `${r.groupId},${r.protocol},${r.protocolType}`}
+                    search={r => `${r.name},${r.protocol},${r.protocolType}`}
                     rows={this.state.rows}
                     raw={this.state.data.groups}
                     url={this.url}

@@ -1,3 +1,4 @@
+use rdkafka::groups::GroupInfo;
 use rdkafka::Message;
 use rocket::serde::json::Json;
 
@@ -18,10 +19,17 @@ use rdkafka::consumer::StreamConsumer;
 use rdkafka::error::{KafkaResult};
 use rdkafka::message::BorrowedMessage;
 
+use rayon::prelude::*;
+use itertools::Itertools;
+use std::io::{Cursor, BufRead};
+use byteorder::{BigEndian, ReadBytesExt};
+use cached::proc_macro::cached;
+
 use futures::StreamExt;
 
-use std::time::Duration;
+use std::time::{Duration,Instant};
 use std::thread;
+use std::thread::sleep;
 
 use tokio::time::timeout;
 
@@ -100,14 +108,12 @@ fn kafka_retry<C, T, E: std::fmt::Debug>(
 }
 
 fn base_consumer() -> KafkaResult<BaseConsumer> {
-    println!("Connecting to kafka at: {}", (*config::SETTINGS).kafka.urls);
     ClientConfig::new()
         .set("bootstrap.servers", &(*config::SETTINGS).kafka.urls)
         .create()
 }
 
 fn group_consumer(group: &str) -> KafkaResult<BaseConsumer> {
-    println!("Connecting to kafka at: {}", (*config::SETTINGS).kafka.urls);
     ClientConfig::new()
         .set("bootstrap.servers", &(*config::SETTINGS).kafka.urls)
         .set("group.id", group)
@@ -150,12 +156,18 @@ pub fn get_topics() -> Result<Json<dto::GetTopicsResult>, String> {
 
 #[get("/api/topic/<topic>")]
 pub fn get_topic(topic: &str) -> Result<Json<dto::GetTopicResult>, String> {
-    let offsets = _get_offsets(topic)?;
-    let groups = _get_topic_consumer_groups(topic, &offsets, false)?;
-    Ok(Json(dto::GetTopicResult{
+    let res = cached_get_topic(topic.to_string())?;
+    Ok(Json(res))
+}
+
+#[cached(time=300, size=10000, result = true)]
+fn cached_get_topic(topic: String) -> Result<dto::GetTopicResult, String> {
+    let offsets = _get_offsets(&topic)?;
+    let groups = _get_topic_consumer_groups(&topic, &offsets, false)?;
+    Ok(dto::GetTopicResult{
         offsets: offsets,
         consumer_groups: groups,
-    }))
+    })
 }
 
 #[get("/api/topic/<topic>/config")]
@@ -208,20 +220,16 @@ pub fn get_cluster() -> Result<Json<dto::GetClusterResult>, String> {
 
 #[get("/api/groups")]
 pub fn get_groups() -> Result<Json<dto::GetGroupsResult>, String> {
-    let timeout = Duration::from_secs(10);
-    let groups = kafka_retry("fetching groups", &mut base_consumer, &mut |consumer| consumer
-        .fetch_group_list(None, timeout))?;
-
-    let groups = groups.groups();
+    let groups = cached_fetch_group_list()?;
     let mut out = Vec::with_capacity(groups.len());
     for group in groups {
-        let members = _get_members(&group);
+        let members = _get_members(&group)?;
         out.push(
             dto::GroupMetadata{
-                name: group.name().to_string(),
-                protocol: group.protocol().to_string(),
-                protocol_type: group.protocol_type().to_string(),
-                state: group.state().to_string(),
+                name: group.name.to_string(),
+                protocol: group.protocol.to_string(),
+                protocol_type: group.protocol_type.to_string(),
+                state: group.state.to_string(),
                 members: members,
             }
         );
@@ -245,7 +253,7 @@ pub fn get_group_members(group: &str) -> Result<Json<dto::GetGroupMembersResult>
         return Err("too many groups found".to_string());
     }
     let group = &groups[0];
-    let members = _get_members(&group);
+    let members = _get_members(&to_group(group))?;
 
     Ok(Json(dto::GetGroupMembersResult{members: members}))
 }
@@ -311,17 +319,22 @@ pub fn get_offset_for_timestamp(topic: &str, partition: i32, timestamp: i64) -> 
     }
 }
 
-fn _get_members(group: &rdkafka::groups::GroupInfo) -> Vec<dto::GroupMemberMetadata> {
-    let mut members = Vec::with_capacity(group.members().len());
-    for member in group.members() {
-        let assignment = match member.assignment() {
-            None => "",
-            Some(assgn) => match std::str::from_utf8(assgn) {
-                Ok(v) => v,
-                Err(_) => "Non-Utf8",
+fn _get_members(group: &CachedGroup) -> Result<Vec<dto::GroupMemberMetadata>, String> {
+    let mut members = Vec::with_capacity(group.members.len());
+    for member in &group.members {
+        let assignment = match &member.assignment {
+            None => "".to_string(),
+            Some(payload) => {
+                match _parse_member_assignment(&payload) {
+                    Ok(assignments) => assignments.iter().map(|ass| ass.topic.to_string() + " [" + &ass.partitions.iter().join(",") + "]").join(", "),
+                    Err(err) => {
+                        eprintln!("failed parsing group {}: {}", group.name.to_string(), err);
+                        "???".to_string()
+                    }
+                }
             }
         };
-        let meta = match member.metadata() {
+        let meta = match &member.metadata {
             None => "",
             Some(data) => match std::str::from_utf8(data) {
                 Ok(v) => v,
@@ -330,14 +343,14 @@ fn _get_members(group: &rdkafka::groups::GroupInfo) -> Vec<dto::GroupMemberMetad
         };
         members.push(
             dto::GroupMemberMetadata{
-                member_id: member.id().to_string(),
-                client_id: member.client_id().to_string(),
-                client_host: member.client_host().to_string(),
+                member_id: member.id.to_string(),
+                client_id: member.client_id.to_string(),
+                client_host: member.client_host.to_string(),
                 metadata: meta.to_string(),
                 assignment: assignment.to_string(),
             })
     }
-    members
+    Ok(members)
 }
 
 fn _get_entries(configs: Vec<ConfigResourceResult>) -> Result<Vec<dto::ConfigEntry>, String> {
@@ -394,62 +407,101 @@ fn _get_offsets(topic: &str) -> Result<Vec<dto::TopicOffsets>, String> {
     Ok(offsets)
 }
 
-fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<dto::TopicOffsets>, with_committed_offset: bool) -> Result<Vec<dto::TopicConsumerGroup>, String> {
-    //todo: we're fetching all groups each time we fetch for a specific topic, we can use a very short-lived cache instead as we query for all topics from the topics page
+#[derive(Clone)]
+struct CachedMember {
+    assignment: Option<Vec<u8>>,
+    metadata: Option<Vec<u8>>,
+    id: String,
+    client_id: String,
+    client_host: String,
+}
+
+#[derive(Clone)]
+struct CachedGroup {
+    name: String,
+    protocol: String,
+    state: String,
+    protocol_type: String,
+    members: Vec<CachedMember>,
+}
+
+fn to_group(group: &GroupInfo) -> CachedGroup {
+    CachedGroup{
+        name: group.name().to_string(),
+        protocol_type: group.protocol_type().to_string(),
+        protocol: group.protocol().to_string(),
+        state: group.state().to_string(),
+        members: group.members().iter().map(|member| CachedMember{
+            assignment: member.assignment().map(|ass| ass.to_vec()),
+            metadata: member.metadata().map(|meta| meta.to_vec()),
+            id: member.id().to_string(),
+            client_id: member.client_id().to_string(),
+            client_host: member.client_host().to_string(),
+        }).collect(),
+    }
+}
+
+#[cached(time=60, size=10000, result = true)]
+fn cached_fetch_group_list() -> Result<Vec<CachedGroup>, String> {
+    eprintln!("Refreshing groups cache");
+    let start = Instant::now();
+
     let timeout = Duration::from_secs(10);
     let groups = kafka_retry("fetching groups", &mut base_consumer, &mut |consumer| consumer
         .fetch_group_list(None, timeout))?;
+    let out = groups.groups().iter().map(|group|to_group(group)).collect();
+    eprintln!("Refreshed groups cache in {:?}", start.elapsed());
+    Ok(out)
+}
 
-    let groups = groups.groups();
+fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<dto::TopicOffsets>, with_committed_offset: bool) -> Result<Vec<dto::TopicConsumerGroup>, String> {
+    let timeout = Duration::from_secs(10);
+    let groups = cached_fetch_group_list()?;
     let mut topic_groups = Vec::with_capacity(groups.len());
     for group in groups {
-        if group.protocol_type() != "consumer" {
-            eprintln!("skipping group {} of type {}", group.name(), group.protocol_type());
+        if group.protocol_type != "consumer" {
             continue
         }
-        for member in group.members() {
-            match member.assignment() {
+        let num_members = group.members.len();
+        for member in group.members {
+            match member.assignment {
                 None => continue,
-                Some(assgn) => {
-                    match std::str::from_utf8(assgn) {
-                        Ok(v) => {
-                            //eprintln!("member assignment for group {}: {}", group.name(), v);
-                            let pattern = format!("{}\u{0000}", topic);
-                            if v.contains(&pattern) {
-                                let mut consumer_group_offsets = Vec::with_capacity(group.members().len());
-                                if with_committed_offset {
-                                    let committed: TopicPartitionList = kafka_retry("fetching offsets for times", &mut || group_consumer(group.name()), &mut |consumer| {
-                                        let mut tpl = TopicPartitionList::new();
-                                        for offset in offsets {
-                                            tpl.add_partition_offset(topic, offset.partition, rdkafka::Offset::Offset(0))?;
-                                        }
-                                        consumer.committed_offsets(tpl, timeout)
-                                    })?;
-                                    for elem in committed.elements() {
-                                        if let rdkafka::Offset::Offset(offset) = elem.offset() {
-                                            if let Some(partition_offsets) = offsets.iter().find(|v| v.partition == elem.partition()) {
-                                                let consumer_offsets = dto::ConsumerGroupOffsets{
-                                                    metadata: Some(elem.metadata().to_string()),
-                                                    offset: offset,
-                                                    partition_offsets: *partition_offsets,
-                                                };
-                                                consumer_group_offsets.push(consumer_offsets);
-                                            } else {
-                                                eprintln!("did not find offsets for topic {} and partition {}", topic, elem.partition());
-                                            }
+                Some(payload) => {
+                    let assignments = _parse_member_assignment(&payload)?;
+                    for assgn in assignments {
+                        if assgn.topic == topic {
+                            let mut consumer_group_offsets = Vec::with_capacity(num_members);
+                            if with_committed_offset {
+                                let committed: TopicPartitionList = kafka_retry("fetching offsets for times", &mut || group_consumer(&group.name), &mut |consumer| {
+                                    let mut tpl = TopicPartitionList::new();
+                                    for offset in offsets {
+                                        tpl.add_partition_offset(topic, offset.partition, rdkafka::Offset::Offset(0))?;
+                                    }
+                                    consumer.committed_offsets(tpl, timeout)
+                                })?;
+                                for elem in committed.elements() {
+                                    if let rdkafka::Offset::Offset(offset) = elem.offset() {
+                                        if let Some(partition_offsets) = offsets.iter().find(|v| v.partition == elem.partition()) {
+                                            let consumer_offsets = dto::ConsumerGroupOffsets{
+                                                metadata: Some(elem.metadata().to_string()),
+                                                offset: offset,
+                                                partition_offsets: *partition_offsets,
+                                            };
+                                            consumer_group_offsets.push(consumer_offsets);
                                         } else {
-                                            eprintln!("bad offset type: {:?}", elem.offset());
+                                            eprintln!("did not find offsets for topic {} and partition {}", topic, elem.partition());
                                         }
+                                    } else {
+                                        eprintln!("bad offset type: {:?}", elem.offset());
                                     }
                                 }
-                                let topic_group = dto::TopicConsumerGroup{
-                                    group_id: group.name().to_string(),
-                                    offsets: consumer_group_offsets,
-                                };
-                                topic_groups.push(topic_group);
                             }
-                        },
-                        Err(_) => eprintln!("failed to parse member assignment for group {}", group.name()),
+                            let topic_group = dto::TopicConsumerGroup{
+                                group_id: group.name.to_string(),
+                                offsets: consumer_group_offsets,
+                            };
+                            topic_groups.push(topic_group);
+                        }
                     }
                 }
             }
@@ -457,6 +509,39 @@ fn _get_topic_consumer_groups(topic: &str, offsets: &Vec<dto::TopicOffsets>, wit
     }
 
     Ok(topic_groups)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MemberAssignment {
+    pub topic: String,
+    pub partitions: Vec<i32>,
+}
+
+// from: https://github.com/fede1024/rust-rdkafka/pull/184
+fn _parse_member_assignment(payload: &[u8]) -> Result<Vec<MemberAssignment>, String> {
+    let mut cursor = Cursor::new(payload);
+    let _version = map_error(cursor.read_i16::<BigEndian>())?;
+    let assign_len = map_error(cursor.read_i32::<BigEndian>())?;
+    let mut assigns = Vec::with_capacity(assign_len as usize);
+    for _ in 0..assign_len {
+        let len = map_error(cursor.read_i16::<BigEndian>())?;
+        let len_usize = len as usize;
+        let pos = cursor.position() as usize;
+        if &cursor.get_ref().len() < &(pos + len_usize) {
+            return Err("failed reading topic from assignment".to_string());
+        }
+        let topic = map_error(std::str::from_utf8(&cursor.get_ref()[pos..(pos + len_usize)]))?;
+        cursor.consume(len as usize);
+        //let topic = _read_str(&mut cursor)?;
+        let partition_len = map_error(cursor.read_i32::<BigEndian>())?;
+        let mut partitions = Vec::with_capacity(partition_len as usize);
+        for _ in 0..partition_len {
+            let partition = map_error(cursor.read_i32::<BigEndian>())?;
+            partitions.push(partition);
+        }
+        assigns.push(MemberAssignment { topic: topic.to_string(), partitions })
+    }
+    Ok(assigns)
 }
 
 #[get("/api/messages/<topic>/<partition>?<limit>&<offset>&<search>&<search_style>&<timeout_millis>&<trace>&<decoding>")]
@@ -625,4 +710,29 @@ fn includes(text: String, pattern: String, style: &dto::SearchStyle, regex: &Opt
         dto::SearchStyle::CaseSensitive => text.contains(&pattern),
         dto::SearchStyle::Regex => (*regex).as_ref().unwrap().is_match(&text),
     }
+}
+
+pub fn update_cache_thread() {
+    std::thread::spawn(|| {
+        loop {
+            eprintln!("Refreshing topic cache");
+            let start = Instant::now();
+            match get_topics() {
+                Ok(topics) => {
+                    topics.into_inner().topics.par_iter_mut().for_each(|topic| {
+                        // this method is generated by the `cached` macro
+                        match cached_get_topic_prime_cache(topic.name.to_string()) {
+                            Ok(_) => {},
+                            Err(err) => { eprintln!("failed refreshing topic cache for {}: {}", topic.name.to_string(), err); }
+                        }
+                    });
+                },
+                Err(err) => {
+                    eprintln!("error getting topics: {}", err);
+                }
+            }
+            eprintln!("Refreshed topic cache in {:?}", start.elapsed());
+            sleep(Duration::from_secs(5));
+        }
+    });
 }
