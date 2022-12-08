@@ -180,7 +180,7 @@ export class Messages extends React.Component<Props, State> {
         const customCols = {cols: {}}
         const rows = data.messages.map(d => this.getRow(d, customCols))
         let warning = ""
-        if (data.hasTimeout) {
+        if (data.has_timeout) {
             if (this.props.match.params.topic === undefined) {
                 warning = `Some messages may (or may not) be missing as one or more topics timed out`
             } else {

@@ -1,17 +1,33 @@
-use schema_registry_converter::async_impl::schema_registry::SrSettings;
-use schema_registry_converter::async_impl::avro::AvroDecoder;
+use std::sync::Arc;
 use async_trait::async_trait;
-use avro_rs::types::Value;
-use rdkafka::message::BorrowedMessage;
+use apache_avro::types::Value;
+use rdkafka::message::OwnedMessage;
 use rdkafka::message::Message;
 use serde_json::Value as JsonValue;
 use serde_json::json;
-use std::sync::RwLock;
-use serverapi::{Decoder, DecodingAttribute, DecodedContents, Config};
+use serverapi::{Decoder, DecoderBuilder, DecodingAttribute, DecodedContents, Config};
+use schema_registry_converter::async_impl::schema_registry::SrSettings;
+use schema_registry_converter::async_impl::avro::AvroDecoder;
 
 #[derive(Debug, Default)]
+pub struct AvroConfluentDecoderBuilder {}
+
+#[async_trait]
+impl DecoderBuilder for AvroConfluentDecoderBuilder {
+    async fn build(&self, config: Box<dyn Config + Send>) -> Box<dyn Decoder>{
+        let settings = SrSettings::new(config.get_string("confluent-schema-registry.url".to_string()).unwrap());
+        Box::new(AvroConfluentDecoder::new(settings))
+    }
+}
+#[derive(Debug)]
 pub struct AvroConfluentDecoder {
-    settings: RwLock<Option<SrSettings>>,
+    decoder: Arc<AvroDecoder<'static>>,
+}
+
+impl AvroConfluentDecoder {
+    fn new(settings: SrSettings) -> Self {
+        Self { decoder: Arc::new(AvroDecoder::new(settings)) }
+    }
 }
 
 #[async_trait]
@@ -24,59 +40,52 @@ impl Decoder for AvroConfluentDecoder {
         "Avro (Confluent Schema Registry)"
     }
 
-    async fn on_init(&self, config: Box<dyn Config + Send>) {
-        let mut settings = self.settings.write().unwrap();
-        *settings = Some(SrSettings::new(config.get_string("confluent-schema-registry.url".to_string()).unwrap()));
-    }
-
-    async fn decode(&self, message: &BorrowedMessage, attribute: &DecodingAttribute) -> Result<DecodedContents, String> {
+    async fn decode(&self, message: &OwnedMessage, attribute: &DecodingAttribute) -> Result<DecodedContents, String> {
+        let decoder: Arc<AvroDecoder<'static>> = Arc::clone(&self.decoder);
         match attribute {
-            DecodingAttribute::Key => self.decode_payload(message.key()).await,
-            DecodingAttribute::Value => self.decode_payload(message.payload()).await,
+            DecodingAttribute::Key => decode_payload(&decoder, message.key()).await,
+            DecodingAttribute::Value => decode_payload(&decoder, message.payload()).await,
         }
     }
 }
 
-impl AvroConfluentDecoder {
-    async fn decode_payload(&self, payload: Option<&[u8]>) -> Result<DecodedContents, String> {
-        match payload {
-            None => Ok(DecodedContents{json: None}),
-            Some(_) => {
-                let mut decoder = AvroDecoder::new(self.settings.read().unwrap().as_ref().unwrap().clone());
-                let task = decoder.decode(payload);
-                match task.await {
-                    Err(err) => {
-                        eprintln!("error decoding avro: {}", err);
-                        return Ok(DecodedContents{json: None});
-                    },
-                    Ok(val) => {
-                        let mut decoded_val = val.value;
-                        decode_bytes(&mut decoded_val);
-                        let schema = match val.name {
-                            None => None,
-                            Some(v) => Some(format!("{}.{}", v.namespace.unwrap_or("".to_string()), v.name)),
-                        };
-                        let json;
-                        match JsonValue::try_from(decoded_val) {
-                            Err(err) => {
-                                eprintln!("error parsing json: {}", err);
-                                json = format!("error parsing json: {}", err);
-                            },
-                            Ok(mut json_val) => {
-                                if let Some(map) = json_val.as_object_mut() {
-                                    map.insert("schema_event_type".to_string(), json!(schema));
-                                }
-                                json = match serde_json::to_string(&json_val) {
-                                    Ok(v) => v,
-                                    Err(e) => e.to_string(),
-                                }
+async fn decode_payload(avro_decoder: &AvroDecoder<'static>, payload: Option<&[u8]>) -> Result<DecodedContents, String> {
+    match payload {
+        None => Ok(DecodedContents{json: None}),
+        Some(_) => {
+            let task = avro_decoder.decode(payload).await;
+            match task {
+                Err(err) => {
+                    eprintln!("error decoding avro: {}", err);
+                    return Ok(DecodedContents{json: None});
+                },
+                Ok(val) => {
+                    let mut decoded_val = val.value;
+                    decode_bytes(&mut decoded_val);
+                    let schema = match val.name {
+                        None => None,
+                        Some(v) => Some(format!("{}.{}", v.namespace.unwrap_or("".to_string()), v.name)),
+                    };
+                    let json;
+                    match JsonValue::try_from(decoded_val) {
+                        Err(err) => {
+                            eprintln!("error parsing json: {}", err);
+                            json = format!("error parsing json: {}", err);
+                        },
+                        Ok(mut json_val) => {
+                            if let Some(map) = json_val.as_object_mut() {
+                                map.insert("schema_event_type".to_string(), json!(schema));
                             }
+                            json = match serde_json::to_string(&json_val) {
+                                Ok(v) => v,
+                                Err(e) => e.to_string(),
+                            };
                         }
-                        return Ok(DecodedContents{json: Some(json)});
                     }
-                };
-            },
-        }
+                    return Ok(DecodedContents{json: Some(json)});
+                }
+            };
+        },
     }
 }
 
@@ -104,7 +113,7 @@ fn decode_bytes(val: &mut Value) {
                 decode_bytes(v);
             }
         },
-        Value::Union(uni) => {
+        Value::Union(_, uni) => {
             decode_bytes(uni);
         }
         _ => {},

@@ -1,7 +1,17 @@
 use async_trait::async_trait;
-use rdkafka::message::BorrowedMessage;
+use rdkafka::message::OwnedMessage;
 use rdkafka::message::Message;
-use serverapi::{Decoder, DecodingAttribute, DecodedContents};
+use serverapi::{Decoder, DecoderBuilder, Config, DecodingAttribute, DecodedContents};
+
+#[derive(Debug, Default)]
+pub struct Utf8DecoderBuilder {}
+
+#[async_trait]
+impl DecoderBuilder for Utf8DecoderBuilder {
+    async fn build(&self, _: Box<dyn Config + Send>) -> Box<dyn Decoder>{
+        Box::new(Utf8Decoder{})
+    }
+}
 
 #[derive(Debug, Default)]
 pub struct Utf8Decoder {
@@ -17,7 +27,7 @@ impl Decoder for Utf8Decoder {
         "UTF-8"
     }
 
-    async fn decode(&self, message: &BorrowedMessage, attribute: &DecodingAttribute) -> Result<DecodedContents, String> {
+    async fn decode(&self, message: &OwnedMessage, attribute: &DecodingAttribute) -> Result<DecodedContents, String> {
         match attribute {
             DecodingAttribute::Key => self.decode_payload(message.key()).await,
             DecodingAttribute::Value => self.decode_payload(message.payload()).await,

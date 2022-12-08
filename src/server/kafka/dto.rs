@@ -139,7 +139,7 @@ pub struct GetOffsetForTimestampResult {
     pub offset: i64,
 }
 
-#[derive(Serialize, FromFormField, Debug)]
+#[derive(Serialize, FromFormField, Debug, Copy, Clone)]
 pub enum SearchStyle {
     None,
     #[field(value = "case-sensitive")]

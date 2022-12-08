@@ -1,3 +1,4 @@
+use rdkafka::message::OwnedMessage;
 use rdkafka::groups::GroupInfo;
 use rdkafka::Message;
 use rocket::serde::json::Json;
@@ -17,9 +18,8 @@ use rdkafka::consumer::Rebalance;
 use rdkafka::consumer::ConsumerContext;
 use rdkafka::consumer::StreamConsumer;
 use rdkafka::error::{KafkaResult};
-use rdkafka::message::BorrowedMessage;
 
-use rayon::prelude::*;
+//use rayon::prelude::*;
 use itertools::Itertools;
 use std::io::{Cursor, BufRead};
 use byteorder::{BigEndian, ReadBytesExt};
@@ -29,7 +29,7 @@ use futures::StreamExt;
 
 use std::time::{Duration,Instant};
 use std::thread;
-use std::thread::sleep;
+//use std::thread::sleep;
 
 use tokio::time::timeout;
 
@@ -162,7 +162,7 @@ pub fn get_topic(topic: &str) -> Result<Json<dto::GetTopicResult>, String> {
 
 #[cached(time=300, size=10000, result = true)]
 fn cached_get_topic(topic: String) -> Result<dto::GetTopicResult, String> {
-    let offsets = _get_offsets(&topic)?;
+    let offsets = _get_offsets(&topic, None)?;
     let groups = _get_topic_consumer_groups(&topic, &offsets, false)?;
     Ok(dto::GetTopicResult{
         offsets: offsets,
@@ -269,14 +269,14 @@ pub fn get_decoders() -> Result<Json<dto::GetDecodersResult>, String> {
 
 #[get("/api/topic/<topic>/consumer_groups")]
 pub fn get_topic_consumer_groups(topic: &str) -> Result<Json<dto::GetTopicConsumerGroupsResult>, String> {
-    let offsets = _get_offsets(topic)?;
+    let offsets = _get_offsets(topic, None)?;
     let groups = _get_topic_consumer_groups(topic, &offsets, true)?;
     Ok(Json(dto::GetTopicConsumerGroupsResult{consumer_groups: groups}))
 }
 
 #[get("/api/topic/<topic>/offsets")]
 pub fn get_offsets(topic: &str) -> Result<Json<dto::GetTopicOffsetsResult>, String> {
-    let offsets = _get_offsets(topic)?;
+    let offsets = _get_offsets(topic, None)?;
     Ok(Json(dto::GetTopicOffsetsResult{
         offsets: offsets,
     }))
@@ -307,7 +307,7 @@ pub fn get_offset_for_timestamp(topic: &str, partition: i32, timestamp: i64) -> 
             offset: offset,
         })),
         rdkafka::Offset::End => {
-            let topic_offsets = _get_offsets(topic)?;
+            let topic_offsets = _get_offsets(topic, Some(partition))?;
             if let Some(partition_offsets) = topic_offsets.iter().find(|v| v.partition == partition) {
                 return Ok(Json(dto::GetOffsetForTimestampResult{
                     offset: partition_offsets.high,
@@ -380,12 +380,16 @@ fn _get_entries(configs: Vec<ConfigResourceResult>) -> Result<Vec<dto::ConfigEnt
     Ok(entries)
 }
 
-fn _get_offsets(topic: &str) -> Result<Vec<dto::TopicOffsets>, String> {
+fn _get_offsets(topic: &str, for_partition: Option<i32>) -> Result<Vec<dto::TopicOffsets>, String> {
+    let start = Instant::now();
     let consumer: BaseConsumer = retry("connecting consumer", &mut || base_consumer())?;
+    eprintln!("connnecting consumer took {:?}", start.elapsed());
+    let start = Instant::now();
 
     let timeout = Duration::from_secs(10);
     let metadata = retry("fetching metadata", &mut || consumer
         .fetch_metadata(Some(topic), timeout))?;
+    eprintln!("fetching metadata took {:?}", start.elapsed());
 
     if metadata.topics().len() == 0 {
         return Err("topic not found".to_string())
@@ -396,8 +400,15 @@ fn _get_offsets(topic: &str) -> Result<Vec<dto::TopicOffsets>, String> {
     let partitions = metadata.topics()[0].partitions();
     let mut offsets = Vec::with_capacity(partitions.len());
     for partition in partitions {
+        if let Some(asked_partition) = for_partition {
+            if asked_partition != partition.id() {
+                continue
+            }
+        }
+        let start = Instant::now();
         let watermarks = retry("fetching watermarks", &mut || consumer
             .fetch_watermarks(topic, partition.id(), timeout))?;
+        eprintln!("fetching watermarks took {:?}", start.elapsed());
         offsets.push(dto::TopicOffsets{
             partition: partition.id(),
             low: watermarks.0,
@@ -569,7 +580,14 @@ pub async fn get_messages(
     }
 }
 
-async fn _get_messages(topic: &str,
+fn measure(operation: &str, dur: Duration) {
+    if dur > Duration::from_millis(1) {
+        eprintln!("{:?} took {:?}", operation, dur)
+    }
+}
+
+async fn _get_messages(
+    topic: &str,
     partition: i32,
     mut limit: i64,
     offset: i64,
@@ -577,6 +595,7 @@ async fn _get_messages(topic: &str,
     search_style: dto::SearchStyle,
     trace: bool,
     decoding: &str) -> Result<Json<dto::GetTopicMessagesResult>, String> {
+    let start = Instant::now();
     let regex: Option<Regex> = match search_style {
         dto::SearchStyle::Regex =>
             if let Some(pattern) = &search
@@ -584,9 +603,9 @@ async fn _get_messages(topic: &str,
                 { None },
         _ => None,
     };
-    let topic_offsets = get_offsets(topic)?;
+    let topic_offsets = _get_offsets(topic, Some(partition))?;
     let mut found_partition = false;
-    for offsets in &topic_offsets.offsets{
+    for offsets in &topic_offsets{
         if offsets.partition != partition {
             continue;
         }
@@ -635,54 +654,90 @@ async fn _get_messages(topic: &str,
     let mut messages = Vec::with_capacity(limit.try_into().unwrap());
 
     let mut message_stream = consumer.stream();
+    measure("starting the stream", start.elapsed());
+    let mut start_consume = Instant::now();
     while let Some(message) = message_stream.next().await {
+        measure("consuming message", start_consume.elapsed());
+        let start_processing = Instant::now();
         num_consumed += 1;
         match message {
             Err(e) => eprintln!("Kafka error: {}", e),
             Ok(m) => {
-                let timestamp = match m.timestamp() {
-                    Timestamp::NotAvailable => 0,
-                    Timestamp::CreateTime(v) => v,
-                    Timestamp::LogAppendTime(v) => v,
-                };
-                let decoded_value = decode(&m, DecodingAttribute::Value, &value_decoders).await?;
-                let json_value = &decoded_value.contents.json.unwrap();
-                let decoded_key = decode(&m, DecodingAttribute::Key, &key_decoders).await?;
-                let json_key = &decoded_key.contents.json.unwrap();
-                if trace {
-                    eprintln!("key: '{:?}', value: {:?}, topic: {}, offset: {}, timestamp: {:?}",
-                        json_key, json_value, m.topic(), m.offset(), timestamp);
-                }
-                let mut filtered_out = false;
-                if let Some(pattern) = search {
-                    let text = format!("{},{}", json_key, json_value);
-                    if !includes(text, pattern.to_string(), &search_style, &regex) {
-                        filtered_out = true;
-                    }
-                }
-                if !filtered_out {
-                    let msg = dto::TopicMessage{
-                        topic: topic.to_string(),
-                        partition: partition,
-                        key: json_key.to_string(),
-                        timestamp: timestamp,
-                        offset: m.offset(),
-                        value: json_value.to_string(),
-                        key_decoding: decoded_key.decoding,
-                        value_decoding: decoded_value.decoding,
-                    };
-                    messages.push(msg);
+                let start_detach = Instant::now();
+                let owned = m.detach();
+                measure("detach", start_detach.elapsed());
+                let owned_search = search.map(|s| s.to_string());
+                let owned_regex = regex.clone();
+                let owned_key_decoders = key_decoders.to_vec();
+                let owned_value_decoders = value_decoders.to_vec();
+                measure("detach all", start_detach.elapsed());
+                let msg = parse_message(owned, partition, owned_search, search_style, trace, owned_regex, owned_key_decoders, owned_value_decoders).await?;
+                if let Some(message) = msg {
+                    messages.push(message);
                 }
             }
         };
+        measure("processing message", start_processing.elapsed());
         if num_consumed >= limit {
             break;
         }
+        start_consume = Instant::now();
     }
+
+    eprintln!("processing all messages ({}) took {:?}", messages.len(), start.elapsed());
     Ok(Json(dto::GetTopicMessagesResult{
         messages: messages,
         has_timeout: false,
     }))
+}
+
+async fn parse_message(
+    m: OwnedMessage,
+    partition: i32,
+    search: Option<String>,
+    search_style: dto::SearchStyle,
+    trace: bool,
+    regex: Option<Regex>,
+    key_decoders: Vec<&Box<dyn Decoder>>,
+    value_decoders: Vec<&Box<dyn Decoder>>
+) -> Result<Option<dto::TopicMessage>, String> {
+    let topic = m.topic();
+    let timestamp = match m.timestamp() {
+        Timestamp::NotAvailable => 0,
+        Timestamp::CreateTime(v) => v,
+        Timestamp::LogAppendTime(v) => v,
+    };
+    let start = Instant::now();
+    let decoded_value = decode(&m, DecodingAttribute::Value, &value_decoders).await?;
+    let decoded_key = decode(&m, DecodingAttribute::Key, &key_decoders).await?;
+    let json_key = &decoded_key.contents.json.unwrap();
+    let json_value = &decoded_value.contents.json.unwrap();
+    measure("decoding key/value", start.elapsed());
+    let start_search = Instant::now();
+    if trace {
+        eprintln!("key: '{:?}', value: {:?}, topic: {}, offset: {}, timestamp: {:?}",
+            json_key, json_value, m.topic(), m.offset(), timestamp);
+    }
+    if let Some(pattern) = search {
+        let text = format!("{},{}", json_key, json_value);
+        if !includes(text, pattern.to_string(), &search_style, &regex) {
+            return Ok(None);
+        }
+    }
+    measure("search", start_search.elapsed());
+    let start_ctor = Instant::now();
+    let out = Some(dto::TopicMessage{
+        topic: topic.to_string(),
+        partition: partition,
+        key: json_key.to_string(),
+        timestamp: timestamp,
+        offset: m.offset(),
+        value: json_value.to_string(),
+        key_decoding: decoded_key.decoding,
+        value_decoding: decoded_value.decoding,
+    });
+    measure("constructing message", start_ctor.elapsed());
+    Ok(out)
 }
 
 pub struct DecodedMessage {
@@ -690,7 +745,7 @@ pub struct DecodedMessage {
     pub decoding: String,
 }
 
-async fn decode(message: &BorrowedMessage<'_>, attr: DecodingAttribute, decoders: &Vec<&Box<dyn Decoder>>) -> Result<DecodedMessage, String>{
+async fn decode(message: &OwnedMessage, attr: DecodingAttribute, decoders: &Vec<&Box<dyn Decoder>>) -> Result<DecodedMessage, String>{
     for decoder in decoders {
         let result = decoder.decode(message, &attr).await?;
         if let Some(_) = result.json {
@@ -713,7 +768,7 @@ fn includes(text: String, pattern: String, style: &dto::SearchStyle, regex: &Opt
 }
 
 pub fn update_cache_thread() {
-    std::thread::spawn(|| {
+    /*std::thread::spawn(|| {
         loop {
             eprintln!("Refreshing topic cache");
             let start = Instant::now();
@@ -734,5 +789,5 @@ pub fn update_cache_thread() {
             eprintln!("Refreshed topic cache in {:?}", start.elapsed());
             sleep(Duration::from_secs(5));
         }
-    });
+    });*/
 }

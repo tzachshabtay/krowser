@@ -433,10 +433,10 @@ const getMessages = async (input: TopicQueryInput, res: any): Promise<TopicMessa
 	consumer.subscribe({ topic: input.topic, fromBeginning: false })
 	res.endTime('subscribe');
 	const consumed: Set<string> = new Set<string>()
-	let hasTimeout = false
+	let has_timeout = false
 	const p = new Promise<void>(async (resolve, reject) => {
 		setTimeout(() => {
-			hasTimeout = true
+			has_timeout = true
 			resolve()
 		}, input.timeout || 20000);
 		res.startTime(`time_to_batch${batchIdx+1}`, `time to batch ${batchIdx+1}`)
@@ -556,7 +556,7 @@ const getMessages = async (input: TopicQueryInput, res: any): Promise<TopicMessa
 		res.startTime('consume', 'consume');
 		await p;
 		res.endTime('consume');
-		return { messages, hasTimeout }
+		return { messages, has_timeout }
 	}
 	finally {
 		res.startTime('cleanupConsumer', 'cleanup consumer');
