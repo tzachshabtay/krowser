@@ -162,7 +162,7 @@ pub fn get_topic(topic: &str) -> Result<Json<dto::GetTopicResult>, String> {
 
 #[cached(time=300, size=10000, result = true)]
 fn cached_get_topic(topic: String) -> Result<dto::GetTopicResult, String> {
-    let offsets = _get_offsets(&topic, None)?;
+    let offsets = _get_offsets(&topic)?;
     let groups = _get_topic_consumer_groups(&topic, &offsets, false)?;
     Ok(dto::GetTopicResult{
         offsets: offsets,
@@ -269,14 +269,14 @@ pub fn get_decoders() -> Result<Json<dto::GetDecodersResult>, String> {
 
 #[get("/api/topic/<topic>/consumer_groups")]
 pub fn get_topic_consumer_groups(topic: &str) -> Result<Json<dto::GetTopicConsumerGroupsResult>, String> {
-    let offsets = _get_offsets(topic, None)?;
+    let offsets = _get_offsets(topic)?;
     let groups = _get_topic_consumer_groups(topic, &offsets, true)?;
     Ok(Json(dto::GetTopicConsumerGroupsResult{consumer_groups: groups}))
 }
 
 #[get("/api/topic/<topic>/offsets")]
 pub fn get_offsets(topic: &str) -> Result<Json<dto::GetTopicOffsetsResult>, String> {
-    let offsets = _get_offsets(topic, None)?;
+    let offsets = _get_offsets(topic)?;
     Ok(Json(dto::GetTopicOffsetsResult{
         offsets: offsets,
     }))
@@ -307,13 +307,10 @@ pub fn get_offset_for_timestamp(topic: &str, partition: i32, timestamp: i64) -> 
             offset: offset,
         })),
         rdkafka::Offset::End => {
-            let topic_offsets = _get_offsets(topic, Some(partition))?;
-            if let Some(partition_offsets) = topic_offsets.iter().find(|v| v.partition == partition) {
-                return Ok(Json(dto::GetOffsetForTimestampResult{
-                    offset: partition_offsets.high,
-                }));
-            }
-            return Err("missing end offset".to_string());
+            let partition_offsets = _get_offsets_for_partition(topic, partition)?;
+            Ok(Json(dto::GetOffsetForTimestampResult{
+                offset: partition_offsets.high,
+            }))
         },
         _ => Err(format!("bad offset type: {:?}", partition_offset.offset()))
     }
@@ -380,7 +377,7 @@ fn _get_entries(configs: Vec<ConfigResourceResult>) -> Result<Vec<dto::ConfigEnt
     Ok(entries)
 }
 
-fn _get_offsets(topic: &str, for_partition: Option<i32>) -> Result<Vec<dto::TopicOffsets>, String> {
+fn _get_offsets(topic: &str) -> Result<Vec<dto::TopicOffsets>, String> {
     let start = Instant::now();
     let consumer: BaseConsumer = retry("connecting consumer", &mut || base_consumer())?;
     eprintln!("connnecting consumer took {:?}", start.elapsed());
@@ -400,11 +397,6 @@ fn _get_offsets(topic: &str, for_partition: Option<i32>) -> Result<Vec<dto::Topi
     let partitions = metadata.topics()[0].partitions();
     let mut offsets = Vec::with_capacity(partitions.len());
     for partition in partitions {
-        if let Some(asked_partition) = for_partition {
-            if asked_partition != partition.id() {
-                continue
-            }
-        }
         let start = Instant::now();
         let watermarks = retry("fetching watermarks", &mut || consumer
             .fetch_watermarks(topic, partition.id(), timeout))?;
@@ -416,6 +408,22 @@ fn _get_offsets(topic: &str, for_partition: Option<i32>) -> Result<Vec<dto::Topi
         });
     }
     Ok(offsets)
+}
+
+fn _get_offsets_for_partition(topic: &str, partition: i32) -> Result<dto::TopicOffsets, String> {
+    let start = Instant::now();
+    let consumer: BaseConsumer = retry("connecting consumer", &mut || base_consumer())?;
+    measure("connecting consumer", start.elapsed());
+    let timeout = Duration::from_secs(10);
+    let start = Instant::now();
+    let watermarks = retry("fetching watermarks", &mut || consumer
+        .fetch_watermarks(topic, partition, timeout))?;
+    measure("fetching watermarks", start.elapsed());
+    Ok(dto::TopicOffsets{
+        partition: partition,
+        low: watermarks.0,
+        high: watermarks.1,
+    })
 }
 
 #[derive(Clone)]
@@ -603,27 +611,16 @@ async fn _get_messages(
                 { None },
         _ => None,
     };
-    let topic_offsets = _get_offsets(topic, Some(partition))?;
-    let mut found_partition = false;
-    for offsets in &topic_offsets{
-        if offsets.partition != partition {
-            continue;
-        }
-        found_partition = true;
-        let max_offset =offsets.high;
-        if max_offset == 0 || offset > max_offset {
-            return Ok(Json(dto::GetTopicMessagesResult{messages: Vec::new(), has_timeout: false}))
-        }
-        if offset + limit > max_offset {
-            limit = max_offset - offset
-        }
-        if limit <= 0 {
-            return Ok(Json(dto::GetTopicMessagesResult{messages: Vec::new(), has_timeout: false}))
-        }
-        break;
+    let offsets = _get_offsets_for_partition(topic, partition)?;
+    let max_offset = offsets.high;
+    if max_offset == 0 || offset > max_offset {
+        return Ok(Json(dto::GetTopicMessagesResult{messages: Vec::new(), has_timeout: false}))
     }
-    if !found_partition {
-        return Err(format!("partition {} not found for topic {}", partition, topic))
+    if offset + limit > max_offset {
+        limit = max_offset - offset
+    }
+    if limit <= 0 {
+        return Ok(Json(dto::GetTopicMessagesResult{messages: Vec::new(), has_timeout: false}))
     }
 
     println!("Connecting to kafka at: {}", (*config::SETTINGS).kafka.urls);
