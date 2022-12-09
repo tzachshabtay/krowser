@@ -7,6 +7,7 @@ import MenuItem from '@material-ui/core/MenuItem';
 import { Fetcher, SearchBy, AllPartitions, FetchData } from './fetcher';
 import { Url } from '../../common/url';
 import { GetTopicOffsetsResult, TopicOffsets } from "../../../shared/api";
+import { CancelToken, Loader } from "../../common/loader";
 
 interface Props {
     topic: string;
@@ -46,14 +47,14 @@ export class SingleTopicInput extends React.Component<Props, State> {
         partition: this.props.partition || "0",
         error: "",
     }
+    loader: Loader = new Loader()
 
     async componentDidMount() {
-        await this.fetchPartitions()
+        await this.loader.Load(this.fetchPartitions)
     }
 
-    async fetchPartitions() {
-        const response = await fetch(`/api/topic/${this.props.topic}/offsets`)
-        const data: GetTopicOffsetsResult = await response.json()
+    fetchPartitions = async(cancelToken: CancelToken) => {
+        const data: GetTopicOffsetsResult = await cancelToken.Fetch(`/api/topic/${this.props.topic}/offsets`)
         if (data.error) {
             this.setState({loadingPartitions: false, error: data.error})
             return

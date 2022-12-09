@@ -50,6 +50,8 @@ fn assets() -> &'static str {
 
 #[launch]
 fn rocket() -> _ {
+    kafka::api::update_cache_thread();
+
     let figment = rocket::Config::figment()
         .merge(("port", (*config::SETTINGS).server.port));
 

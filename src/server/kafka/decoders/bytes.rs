@@ -1,8 +1,18 @@
 use async_trait::async_trait;
-use rdkafka::message::BorrowedMessage;
+use rdkafka::message::OwnedMessage;
 use rdkafka::message::Message;
-use serverapi::{Decoder, DecodingAttribute, DecodedContents};
+use serverapi::{Decoder, DecoderBuilder, DecodingAttribute, DecodedContents, Config};
 
+
+#[derive(Debug, Default)]
+pub struct BytesDecoderBuilder {}
+
+#[async_trait]
+impl DecoderBuilder for BytesDecoderBuilder {
+    async fn build(&self, _: Box<dyn Config + Send>) -> Box<dyn Decoder>{
+        Box::new(BytesDecoder{})
+    }
+}
 
 #[derive(Debug, Default)]
 pub struct BytesDecoder {
@@ -18,7 +28,7 @@ impl Decoder for BytesDecoder {
         "Bytes"
     }
 
-    async fn decode(&self, message: &BorrowedMessage, attribute: &DecodingAttribute) -> Result<DecodedContents, String> {
+    async fn decode(&self, message: &OwnedMessage, attribute: &DecodingAttribute) -> Result<DecodedContents, String> {
         match attribute {
             DecodingAttribute::Key => self.decode_payload(message.key()).await,
             DecodingAttribute::Value => self.decode_payload(message.payload()).await,

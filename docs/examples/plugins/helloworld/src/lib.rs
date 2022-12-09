@@ -2,8 +2,18 @@
 extern crate serverapi;
 
 use std::str;
-use serverapi::{Decoder, DecodedContents, DecodingAttribute};
-use rdkafka::message::BorrowedMessage;
+use serverapi::{Decoder, DecoderBuilder, DecodedContents, DecodingAttribute, Config};
+use rdkafka::message::OwnedMessage;
+
+#[derive(Debug, Default)]
+pub struct HelloWorldBuilder {}
+
+#[async_trait]
+impl DecoderBuilder for HelloWorldBuilder {
+    async fn build(&self, _: Box<dyn Config + Send>) -> Box<dyn Decoder>{
+        Box::new(HelloWorld{})
+    }
+}
 
 #[derive(Debug, Default)]
 pub struct HelloWorld;
@@ -18,9 +28,9 @@ impl Decoder for HelloWorld {
         "Hello World"
     }
 
-    async fn decode(&self, _: &BorrowedMessage, _: &DecodingAttribute) -> Result<DecodedContents, String> {
+    async fn decode(&self, _: &OwnedMessage, _: &DecodingAttribute) -> Result<DecodedContents, String> {
         Ok(DecodedContents{json: Some(r#"{"hello_world":true}"#.to_string())})
     }
 }
 
-declare_plugin!(HelloWorld, HelloWorld::default);
+declare_plugin!(HelloWorldBuilder, HelloWorldBuilder::default);

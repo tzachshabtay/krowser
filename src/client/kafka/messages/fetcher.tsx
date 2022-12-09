@@ -386,8 +386,8 @@ export class Fetcher extends React.Component<Props, State> {
             if (data.error) {
                 out.error = data.error
             }
-            if (data.hasTimeout) {
-                out.hasTimeout = data.hasTimeout
+            if (data.has_timeout) {
+                out.has_timeout = data.has_timeout
             }
             this.setState({ progress: {
                 min,
@@ -398,7 +398,7 @@ export class Fetcher extends React.Component<Props, State> {
                 topic: this.props.topics.length > 1 ? `Topic ${topic}, ` : "",
             }})
             this.props.onDataFetched(out)
-            if (out.error || out.hasTimeout) {
+            if (out.error || out.has_timeout) {
                 break
             }
         }

@@ -1,11 +1,11 @@
 use crate::config::DynamicConfig;
 use crate::kafka::dto::DecoderMetadata;
 use crate::common::errors::map_error;
-use crate::kafka::decoders::avro::AvroConfluentDecoder;
-use crate::kafka::decoders::bytes::BytesDecoder;
-use crate::kafka::decoders::utf8::Utf8Decoder;
+use crate::kafka::decoders::avro::AvroConfluentDecoderBuilder;
+use crate::kafka::decoders::bytes::BytesDecoderBuilder;
+use crate::kafka::decoders::utf8::Utf8DecoderBuilder;
 use crate::config;
-use serverapi::Decoder;
+use serverapi::{Decoder, DecoderBuilder};
 use std::env;
 use std::ffi::OsStr;
 use std::collections::HashMap;
@@ -39,9 +39,9 @@ impl Decoders {
     }
 
     pub async unsafe fn load_all_plugins(&mut self) -> Result<(), String> {
-        self.add_decoder(Box::new(AvroConfluentDecoder::default()));
-        self.add_decoder(Box::new(Utf8Decoder::default()));
-        self.add_decoder(Box::new(BytesDecoder::default()));
+        self.install_decoder(Box::new(AvroConfluentDecoderBuilder::default())).await;
+        self.install_decoder(Box::new(Utf8DecoderBuilder::default())).await;
+        self.install_decoder(Box::new(BytesDecoderBuilder::default())).await;
 
         let decoders_dir = "./decoders";
         if !fs::metadata(decoders_dir).is_ok() {
@@ -56,21 +56,19 @@ impl Decoders {
             eprintln!("Loading decoder from: {}", file_path);
             map_error(self.load_plugin(file_path).await)?;
         }
-        for (_, decoder) in &self.decoders {
-            let conf = DynamicConfig{};
-            let conf_boxed: Box<dyn serverapi::Config + Send> = Box::new(conf);
-            eprintln!("Initializing decoder {}", decoder.id());
-            decoder.on_init(conf_boxed).await;
-        }
         Ok(())
     }
 
-    fn add_decoder(&mut self, decoder: Box<dyn Decoder>) {
+    async fn install_decoder(&mut self, decoder_builder: Box<dyn DecoderBuilder>) {
+        let conf = DynamicConfig{};
+        let conf_boxed: Box<dyn serverapi::Config + Send> = Box::new(conf);
+        let decoder = decoder_builder.build(conf_boxed).await;
+        eprintln!("Installed decoder {}", decoder.id());
         self.decoders.insert(decoder.id().to_string(), decoder);
     }
 
     async unsafe fn load_plugin<P: AsRef<OsStr>>(&mut self, filename: P) -> Result<(), String> {
-        type PluginCreate = unsafe fn() -> *mut dyn Decoder;
+        type PluginCreate = unsafe fn() -> *mut dyn DecoderBuilder;
 
         let lib = map_error(Library::new(filename.as_ref()))?;
 
@@ -84,9 +82,8 @@ impl Decoders {
         let constructor: Symbol<PluginCreate> = map_error(lib.get(b"_plugin_create"))?;
         let boxed_raw = constructor();
 
-        let plugin = Box::from_raw(boxed_raw);
-        eprintln!("Loaded plugin: {}", plugin.id());
-        self.add_decoder(plugin);
+        let plugin_builder = Box::from_raw(boxed_raw);
+        self.install_decoder(plugin_builder).await;
 
         Ok(())
     }
