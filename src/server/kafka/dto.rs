@@ -16,7 +16,7 @@ pub struct BrokerMetadata {
     pub port: i32,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct TopicMetadata {
     pub name: String,
     pub partitions: Vec<PartitionMetadata>,

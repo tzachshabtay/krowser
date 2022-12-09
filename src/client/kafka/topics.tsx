@@ -88,9 +88,28 @@ export class Topics extends React.Component<RouteComponentProps, State> {
         const results: Topic[] = data.topics.map((r: TopicMetadata) => (
             { topic: r.name, num_partitions: r.partitions.length, raw: r, history: this.props.history }))
         this.setState({ loading: false, rows: results })
+        const batch_size = 4;
+        let batch = [];
         for (const topic of results) {
-            await this.fetchTopic(topic, cancelToken)
+            batch.push(this.fetchTopic(topic, cancelToken));
+            if (batch.length === batch_size) {
+                await Promise.all(batch);
+                if (cancelToken.Aborted) return
+                batch = [];
+                if (this.gridApi) {
+                    this.gridApi.refreshCells()
+                }
+                this.forceUpdate();
+            }
+        }
+        if (batch.length > 0) {
+            await Promise.all(batch);
             if (cancelToken.Aborted) return
+            batch = [];
+            if (this.gridApi) {
+                this.gridApi.refreshCells()
+            }
+            this.forceUpdate();
         }
     }
 
@@ -114,10 +133,6 @@ export class Topics extends React.Component<RouteComponentProps, State> {
         } else {
             topic.num_groups = `Unknown`
         }
-        if (this.gridApi) {
-            this.gridApi.refreshCells()
-        }
-        this.forceUpdate();
     }
 
     getColumnDefs() {
