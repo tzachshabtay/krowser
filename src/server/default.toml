@@ -11,13 +11,13 @@ urls = "localhost:9092"
 # key-decoders = "utf8"
 # value-decoders = "my_decoder,utf8"
 #
-# In this exaemple, for all topics that start with "test" (matched by a regular expression), auto-detection will use utf-8
+# In this example, for all topics that start with "test" (matched by a regular expression), auto-detection will use utf-8
 # for decoding the keys, and "my_decoder" (which is assumed to be a user written and installed decoder) will be first used to decode values,
 # and will fallback to utf-8 decoding if that fails.
 #
 # See the plugins example for how to write and install a custom decoder.
-key-decoders = "avro_confluent_schema_registry,utf8"
-value-decoders = "avro_confluent_schema_registry,utf8"
+key-decoders = "avro_confluent_schema_registry,utf8,utf8_lossy"
+value-decoders = "avro_confluent_schema_registry,utf8,utf8_lossy"
 
 [confluent-schema-registry]
 # The url used to connect to the confluent schema registry.

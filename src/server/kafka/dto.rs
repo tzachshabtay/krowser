@@ -147,10 +147,10 @@ pub enum SearchStyle {
     Regex,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Eq, Ord, PartialEq, PartialOrd)]
 pub struct DecoderMetadata {
-    pub id: String,
     pub display_name: String,
+    pub id: String,
 }
 
 #[derive(Serialize)]

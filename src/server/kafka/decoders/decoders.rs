@@ -4,6 +4,7 @@ use crate::common::errors::map_error;
 use crate::kafka::decoders::avro::AvroConfluentDecoderBuilder;
 use crate::kafka::decoders::bytes::BytesDecoderBuilder;
 use crate::kafka::decoders::utf8::Utf8DecoderBuilder;
+use crate::kafka::decoders::utf8_lossy::Utf8LossyDecoderBuilder;
 use crate::config;
 use serverapi::{Decoder, DecoderBuilder};
 use std::env;
@@ -41,6 +42,7 @@ impl Decoders {
     pub async unsafe fn load_all_plugins(&mut self) -> Result<(), String> {
         self.install_decoder(Box::new(AvroConfluentDecoderBuilder::default())).await;
         self.install_decoder(Box::new(Utf8DecoderBuilder::default())).await;
+        self.install_decoder(Box::new(Utf8LossyDecoderBuilder::default())).await;
         self.install_decoder(Box::new(BytesDecoderBuilder::default())).await;
 
         let decoders_dir = "./decoders";
