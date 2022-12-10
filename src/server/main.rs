@@ -11,6 +11,7 @@ mod kafka {
     mod decoders {
         pub mod avro;
         pub mod utf8;
+        pub mod utf8_lossy;
         pub mod bytes;
         pub mod decoders;
     }

@@ -262,10 +262,11 @@ pub fn get_group_members(group: &str) -> Result<Json<dto::GetGroupMembersResult>
 
 #[get("/api/topic/decoders")]
 pub fn get_decoders() -> Result<Json<dto::GetDecodersResult>, String> {
-    let decoders: Vec<dto::DecoderMetadata>;
+    let mut decoders: Vec<dto::DecoderMetadata>;
     unsafe {
         decoders = DECODERS.get_decoders_metadata();
     }
+    decoders.sort();
     Ok(Json(dto::GetDecodersResult{decoders: decoders}))
 }
 
