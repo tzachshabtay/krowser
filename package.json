@@ -42,7 +42,7 @@
     "@types/long": "^4.0.1",
     "ag-grid-community": "^31.3.4",
     "ag-grid-react": "^23.2.0",
-    "axios": "^0.21.2",
+    "axios": "^0.28.0",
     "ejs": "^3.1.7",
     "express": "^4.17.3",
     "kafka-avro": "^3.2.0",
