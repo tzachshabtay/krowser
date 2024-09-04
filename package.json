@@ -44,7 +44,7 @@
     "ag-grid-react": "^23.2.0",
     "axios": "^0.21.2",
     "ejs": "^3.1.7",
-    "express": "^4.17.3",
+    "express": "^4.19.2",
     "kafka-avro": "^3.2.0",
     "kafkajs": "^1.15.0",
     "long": "^4.0.0",
