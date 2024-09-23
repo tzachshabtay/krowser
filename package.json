@@ -43,7 +43,7 @@
     "ag-grid-community": "^31.3.4",
     "ag-grid-react": "^23.2.0",
     "axios": "^0.28.0",
-    "ejs": "^3.1.7",
+    "ejs": "^3.1.10",
     "express": "^4.21.0",
     "kafka-avro": "^3.2.0",
     "kafkajs": "^1.15.0",
